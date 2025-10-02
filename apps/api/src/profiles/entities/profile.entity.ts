@@ -6,19 +6,19 @@ import {
   UpdateDateColumn,
   JoinColumn,
   OneToOne,
-} from 'typeorm';
-import { User } from '../../users/entities/user.entity';
+} from "typeorm";
+import { User } from "../../users/entities/user.entity";
 
-@Entity('profiles')
+@Entity("profiles")
 export class Profile {
-  @PrimaryColumn({ type: 'bigint', unsigned: true })
+  @PrimaryColumn({ type: "bigint", unsigned: true })
   user_id: number;
 
   @OneToOne(() => User)
-  @JoinColumn({ name: 'user_id' })
+  @JoinColumn({ name: "user_id" })
   user: User;
 
-  @Column({ type: 'int', nullable: true })
+  @Column({ type: "int", nullable: true })
   height_cm: number;
 
   @Column({ length: 50, nullable: true })
@@ -36,16 +36,16 @@ export class Profile {
   @Column({ length: 50, nullable: true })
   smoke: string;
 
-  @Column({ type: 'text', nullable: true })
+  @Column({ type: "text", nullable: true })
   intro_text: string;
 
-  @Column({ type: 'json', nullable: true })
+  @Column({ type: "json", nullable: true })
   values_json: any;
 
-  @Column({ type: 'int', nullable: true })
+  @Column({ type: "int", nullable: true })
   active_time_band: number;
 
-  @Column({ type: 'json', nullable: true })
+  @Column({ type: "json", nullable: true })
   visibility_flags: any;
 
   @CreateDateColumn()

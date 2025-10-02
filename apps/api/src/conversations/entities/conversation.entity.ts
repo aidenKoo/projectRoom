@@ -4,35 +4,47 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
-  ManyToOne,
-  JoinColumn,
   Index,
-} from 'typeorm';
+} from "typeorm";
 
-@Entity('conversations')
-@Index(['matchId'])
+@Entity("conversations")
+@Index(["matchId"])
 export class Conversation {
-  @PrimaryGeneratedColumn('increment', { type: 'bigint' })
+  @PrimaryGeneratedColumn("increment", { type: "bigint" })
   id: string;
 
-  @Column({ name: 'match_id', type: 'bigint' })
+  @Column({ name: "match_id", type: "bigint" })
   matchId: string;
 
-  @Column({ name: 'user_a_id', type: 'varchar', length: 64, comment: '참여자 A (firebase_uid)' })
+  @Column({
+    name: "user_a_id",
+    type: "varchar",
+    length: 64,
+    comment: "참여자 A (firebase_uid)",
+  })
   userAId: string;
 
-  @Column({ name: 'user_b_id', type: 'varchar', length: 64, comment: '참여자 B (firebase_uid)' })
+  @Column({
+    name: "user_b_id",
+    type: "varchar",
+    length: 64,
+    comment: "참여자 B (firebase_uid)",
+  })
   userBId: string;
 
-  @Column({ type: 'datetime', nullable: true, comment: '마지막 메시지 시각' })
+  @Column({ type: "datetime", nullable: true, comment: "마지막 메시지 시각" })
   lastMessageAt?: Date;
 
-  @Column({ type: 'boolean', default: false, comment: '대화 종료 여부 (언매치)' })
+  @Column({
+    type: "boolean",
+    default: false,
+    comment: "대화 종료 여부 (언매치)",
+  })
   isEnded: boolean;
 
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn({ name: "created_at" })
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updated_at' })
+  @UpdateDateColumn({ name: "updated_at" })
   updatedAt: Date;
 }

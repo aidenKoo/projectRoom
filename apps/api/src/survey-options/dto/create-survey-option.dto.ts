@@ -1,5 +1,12 @@
-import { IsEnum, IsString, IsOptional, IsInt, IsBoolean, MaxLength } from 'class-validator';
-import { OptionCategory } from '../entities/survey-option.entity';
+import {
+  IsEnum,
+  IsString,
+  IsOptional,
+  IsInt,
+  IsBoolean,
+  MaxLength,
+} from "class-validator";
+import { OptionCategory } from "../entities/survey-option.entity";
 
 export class CreateSurveyOptionDto {
   @IsEnum(OptionCategory)

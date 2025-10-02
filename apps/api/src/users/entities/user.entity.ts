@@ -1,16 +1,8 @@
-import {
-  Entity,
-  PrimaryGeneratedColumn,
-  Column,
-  CreateDateColumn,
-  UpdateDateColumn,
-  OneToOne,
-  Index,
-} from 'typeorm';
+import { Profile } from "../../profiles/entities/profile.entity";
 
-@Entity('users')
+@Entity("users")
 export class User {
-  @PrimaryGeneratedColumn({ type: 'bigint', unsigned: true })
+  @PrimaryGeneratedColumn({ type: "bigint", unsigned: true })
   id: number;
 
   @Column({ unique: true, length: 128 })
@@ -23,10 +15,10 @@ export class User {
   @Column({ length: 100, nullable: true })
   display_name: string;
 
-  @Column({ type: 'enum', enum: ['M', 'F', 'N'] })
-  gender: 'M' | 'F' | 'N';
+  @Column({ type: "enum", enum: ["M", "F", "N"] })
+  gender: "M" | "F" | "N";
 
-  @Column({ type: 'int' })
+  @Column({ type: "int" })
   birth_year: number;
 
   @Column({ length: 20, nullable: true })

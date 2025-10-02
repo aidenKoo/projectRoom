@@ -6,25 +6,25 @@ import {
   JoinColumn,
   CreateDateColumn,
   Index,
-} from 'typeorm';
-import { User } from '../../users/entities/user.entity';
+} from "typeorm";
+import { User } from "../../users/entities/user.entity";
 
-@Entity('referrals')
-@Index('idx_referrer_name', ['referrerName'])
+@Entity("referrals")
+@Index("idx_referrer_name", ["referrerName"])
 export class Referral {
-  @PrimaryGeneratedColumn({ type: 'bigint', unsigned: true })
+  @PrimaryGeneratedColumn({ type: "bigint", unsigned: true })
   id: number;
 
-  @Column({ type: 'bigint', unsigned: true, name: 'user_id' })
+  @Column({ type: "bigint", unsigned: true, name: "user_id" })
   userId: number;
 
-  @Column({ type: 'varchar', length: 80, name: 'referrer_name' })
+  @Column({ type: "varchar", length: 80, name: "referrer_name" })
   referrerName: string;
 
-  @CreateDateColumn({ type: 'timestamp', name: 'created_at' })
+  @CreateDateColumn({ type: "timestamp", name: "created_at" })
   createdAt: Date;
 
-  @ManyToOne(() => User, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'user_id' })
+  @ManyToOne(() => User, { onDelete: "CASCADE" })
+  @JoinColumn({ name: "user_id" })
   user: User;
 }

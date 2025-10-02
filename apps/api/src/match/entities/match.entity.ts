@@ -6,29 +6,29 @@ import {
   ManyToOne,
   JoinColumn,
   Index,
-} from 'typeorm';
-import { User } from '../../users/entities/user.entity';
+} from "typeorm";
+import { User } from "../../users/entities/user.entity";
 
-@Entity('matches')
-@Index(['uidA', 'uidB'], { unique: true })
+@Entity("matches")
+@Index(["uidA", "uidB"], { unique: true })
 export class Match {
-  @PrimaryGeneratedColumn('increment', { type: 'bigint' })
+  @PrimaryGeneratedColumn("increment", { type: "bigint" })
   id: string;
 
-  @Column({ name: 'uid_a', type: 'varchar', length: 64 })
+  @Column({ name: "uid_a", type: "varchar", length: 64 })
   uidA: string;
 
-  @Column({ name: 'uid_b', type: 'varchar', length: 64 })
+  @Column({ name: "uid_b", type: "varchar", length: 64 })
   uidB: string;
 
   @ManyToOne(() => User)
-  @JoinColumn({ name: 'uid_a' })
+  @JoinColumn({ name: "uid_a" })
   userA: User;
 
   @ManyToOne(() => User)
-  @JoinColumn({ name: 'uid_b' })
+  @JoinColumn({ name: "uid_b" })
   userB: User;
 
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn({ name: "created_at" })
   createdAt: Date;
 }

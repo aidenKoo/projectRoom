@@ -1,7 +1,7 @@
-import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Referral } from './entities/referral.entity';
+import { Injectable } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { Referral } from "./entities/referral.entity";
 
 @Injectable()
 export class ReferralsService {
@@ -34,11 +34,11 @@ export class ReferralsService {
    */
   async getReferrerStats(): Promise<any[]> {
     const result = await this.referralRepository
-      .createQueryBuilder('referral')
-      .select('referral.referrerName', 'referrerName')
-      .addSelect('COUNT(*)', 'count')
-      .groupBy('referral.referrerName')
-      .orderBy('count', 'DESC')
+      .createQueryBuilder("referral")
+      .select("referral.referrerName", "referrerName")
+      .addSelect("COUNT(*)", "count")
+      .groupBy("referral.referrerName")
+      .orderBy("count", "DESC")
       .getRawMany();
 
     return result;
@@ -50,8 +50,8 @@ export class ReferralsService {
   async findByReferrerName(referrerName: string): Promise<Referral[]> {
     return this.referralRepository.find({
       where: { referrerName },
-      relations: ['user'],
-      order: { createdAt: 'DESC' },
+      relations: ["user"],
+      order: { createdAt: "DESC" },
     });
   }
 
@@ -60,8 +60,8 @@ export class ReferralsService {
    */
   async findRecent(limit: number = 50): Promise<Referral[]> {
     return this.referralRepository.find({
-      relations: ['user'],
-      order: { createdAt: 'DESC' },
+      relations: ["user"],
+      order: { createdAt: "DESC" },
       take: limit,
     });
   }

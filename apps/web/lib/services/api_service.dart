@@ -49,7 +49,24 @@ class ApiService {
     final response = await _dio.post('/v1/swipes', data: {
       'targetId': targetId,
       'action': action,
-    });
+    return response.data;
+  }
+
+  // Profiles
+  Future<Map<String, dynamic>> upsertProfile(Map<String, dynamic> data) async {
+    final response = await _dio.post('/v1/profiles', data: data);
+    return response.data;
+  }
+
+  // Preferences
+  Future<Map<String, dynamic>> upsertPreferences(Map<String, dynamic> data) async {
+    final response = await _dio.post('/v1/preferences', data: data);
+    return response.data;
+  }
+
+  // Profiles-Private
+  Future<Map<String, dynamic>> upsertPrivateProfile(Map<String, dynamic> data) async {
+    final response = await _dio.post('/v1/profiles/private', data: data);
     return response.data;
   }
 
@@ -83,6 +100,20 @@ class ApiService {
       'type': type,
     });
     return response.data;
+  }
+
+  // Codes
+  Future<Map<String, dynamic>> validateCode(String code) async {
+    return response.data;
+  }
+
+  Future<void> postInitialAnswers(String matchId, Map<String, String> answers) async {
+    await _dio.post('/v1/matches/$matchId/initial-answers', data: answers);
+  }
+
+  // Referrals
+  Future<void> addReferral(String name) async {
+    await _dio.post('/v1/referrals', data: {'name': name});
   }
 }
 

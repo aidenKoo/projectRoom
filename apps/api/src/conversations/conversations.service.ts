@@ -1,10 +1,15 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Conversation } from './entities/conversation.entity';
-import { Message } from './entities/message.entity';
-import { CreateConversationDto } from './dto/create-conversation.dto';
-import { CreateMessageDto } from './dto/create-message.dto';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+} from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { Conversation } from "./entities/conversation.entity";
+import { Message } from "./entities/message.entity";
+import { CreateConversationDto } from "./dto/create-conversation.dto";
+import { CreateMessageDto } from "./dto/create-message.dto";
+import { MatchService } from "../match/match.service";
 
 @Injectable()
 export class ConversationsService {
@@ -13,12 +18,14 @@ export class ConversationsService {
     private readonly conversationRepository: Repository<Conversation>,
     @InjectRepository(Message)
     private readonly messageRepository: Repository<Message>,
+    private readonly matchService: MatchService,
   ) {}
 
   // 대화 생성 (상호 매칭 후)
-  async create(userId: string, createDto: CreateConversationDto): Promise<Conversation> {
-    // 매칭 정보 조회 필요 (MatchModule에서 가져와야 함)
-    // 여기서는 간단한 예시
+  async create(
+    userId: string,
+    createDto: CreateConversationDto,
+  ): Promise<Conversation> {
     const existing = await this.conversationRepository.findOne({
       where: { matchId: createDto.matchId },
     });
@@ -27,11 +34,16 @@ export class ConversationsService {
       return existing;
     }
 
-    // 실제로는 매칭의 두 사용자 ID를 가져와야 함
+    // matchId로 매칭 정보를 조회하고, 요청한 사용자가 참여자인지 확인
+    const match = await this.matchService.findMatchById(
+      createDto.matchId,
+      userId,
+    );
+
     const conversation = this.conversationRepository.create({
       matchId: createDto.matchId,
-      userAId: userId, // Placeholder
-      userBId: 'other-user', // Placeholder
+      userAId: match.uidA, // 정렬된 ID 그대로 사용
+      userBId: match.uidB,
     });
 
     return this.conversationRepository.save(conversation);
@@ -40,16 +52,21 @@ export class ConversationsService {
   // 내 대화 목록 조회
   async findMyConversations(userId: string): Promise<Conversation[]> {
     return this.conversationRepository
-      .createQueryBuilder('conversation')
-      .where('conversation.user_a_id = :userId OR conversation.user_b_id = :userId', { userId })
-      .andWhere('conversation.is_ended = :isEnded', { isEnded: false })
-      .orderBy('conversation.last_message_at', 'DESC')
+      .createQueryBuilder("conversation")
+      .where(
+        "conversation.user_a_id = :userId OR conversation.user_b_id = :userId",
+        { userId },
+      )
+      .andWhere("conversation.is_ended = :isEnded", { isEnded: false })
+      .orderBy("conversation.last_message_at", "DESC")
       .getMany();
   }
 
   // 특정 대화 조회
   async findOne(id: string, userId: string): Promise<Conversation> {
-    const conversation = await this.conversationRepository.findOne({ where: { id } });
+    const conversation = await this.conversationRepository.findOne({
+      where: { id },
+    });
 
     if (!conversation) {
       throw new NotFoundException(`Conversation with ID ${id} not found`);
@@ -57,7 +74,9 @@ export class ConversationsService {
 
     // 권한 확인
     if (conversation.userAId !== userId && conversation.userBId !== userId) {
-      throw new ForbiddenException('You do not have access to this conversation');
+      throw new ForbiddenException(
+        "You do not have access to this conversation",
+      );
     }
 
     return conversation;
@@ -72,7 +91,7 @@ export class ConversationsService {
     const conversation = await this.findOne(conversationId, userId);
 
     if (conversation.isEnded) {
-      throw new ForbiddenException('This conversation has ended');
+      throw new ForbiddenException("This conversation has ended");
     }
 
     const message = this.messageRepository.create({
@@ -91,12 +110,15 @@ export class ConversationsService {
   }
 
   // 대화의 메시지 목록 조회
-  async getMessages(conversationId: string, userId: string): Promise<Message[]> {
+  async getMessages(
+    conversationId: string,
+    userId: string,
+  ): Promise<Message[]> {
     await this.findOne(conversationId, userId); // 권한 확인
 
     return this.messageRepository.find({
       where: { conversationId },
-      order: { createdAt: 'ASC' },
+      order: { createdAt: "ASC" },
     });
   }
 
@@ -108,9 +130,9 @@ export class ConversationsService {
       .createQueryBuilder()
       .update(Message)
       .set({ isRead: true, readAt: new Date() })
-      .where('conversation_id = :conversationId', { conversationId })
-      .andWhere('sender_uid != :userId', { userId })
-      .andWhere('is_read = :isRead', { isRead: false })
+      .where("conversation_id = :conversationId", { conversationId })
+      .andWhere("sender_uid != :userId", { userId })
+      .andWhere("is_read = :isRead", { isRead: false })
       .execute();
   }
 

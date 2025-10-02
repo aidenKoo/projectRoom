@@ -1,10 +1,10 @@
-import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { User } from '../users/entities/user.entity';
-import { Profile } from '../profiles/entities/profile.entity';
-import { Swipe } from '../swipes/entities/swipe.entity';
-import { ConfigService } from '@nestjs/config';
+import { Injectable } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { User } from "../users/entities/user.entity";
+import { Profile } from "../profiles/entities/profile.entity";
+import { Swipe } from "../swipes/entities/swipe.entity";
+import { ConfigService } from "@nestjs/config";
 
 interface FeedCandidate {
   user: User;
@@ -25,14 +25,11 @@ export class FeedService {
     private configService: ConfigService,
   ) {}
 
-  async getFeed(
-    userId: number,
-    limit: number = 20,
-  ): Promise<FeedCandidate[]> {
+  async getFeed(userId: number, limit: number = 20): Promise<FeedCandidate[]> {
     // 1. Get user's profile
     const myProfile = await this.profilesRepository.findOne({
       where: { user_id: userId },
-      relations: ['user'],
+      relations: ["user"],
     });
 
     if (!myProfile) {
@@ -42,21 +39,21 @@ export class FeedService {
     // 2. Get already swiped user IDs
     const swipedUsers = await this.swipesRepository.find({
       where: { actor_id: userId },
-      select: ['target_id'],
+      select: ["target_id"],
     });
     const swipedIds = swipedUsers.map((s) => s.target_id);
 
     // 3. Candidate generation (hard filters)
     const candidatePoolSize = this.configService.get(
-      'FEED_CANDIDATE_POOL_SIZE',
+      "FEED_CANDIDATE_POOL_SIZE",
       200,
     );
 
     const query = this.profilesRepository
-      .createQueryBuilder('profile')
-      .leftJoinAndSelect('profile.user', 'user')
-      .where('profile.user_id != :userId', { userId })
-      .andWhere('user.id NOT IN (:...swipedIds)', {
+      .createQueryBuilder("profile")
+      .leftJoinAndSelect("profile.user", "user")
+      .where("profile.user_id != :userId", { userId })
+      .andWhere("user.id NOT IN (:...swipedIds)", {
         swipedIds: swipedIds.length > 0 ? swipedIds : [0],
       })
       .limit(candidatePoolSize);
@@ -87,19 +84,19 @@ export class FeedService {
     let score = 0;
 
     // Weights from config
-    const w1 = parseFloat(this.configService.get('WEIGHT_COMMON_TAGS', '0.25'));
+    const w1 = parseFloat(this.configService.get("WEIGHT_COMMON_TAGS", "0.25"));
     const w2 = parseFloat(
-      this.configService.get('WEIGHT_VALUES_MATCH', '0.20'),
+      this.configService.get("WEIGHT_VALUES_MATCH", "0.20"),
     );
     const w3 = parseFloat(
-      this.configService.get('WEIGHT_TIME_OVERLAP', '0.15'),
+      this.configService.get("WEIGHT_TIME_OVERLAP", "0.15"),
     );
-    const w4 = parseFloat(this.configService.get('WEIGHT_DISTANCE', '0.15'));
+    const w4 = parseFloat(this.configService.get("WEIGHT_DISTANCE", "0.15"));
     const w5 = parseFloat(
-      this.configService.get('WEIGHT_RESPONSIVENESS', '0.15'),
+      this.configService.get("WEIGHT_RESPONSIVENESS", "0.15"),
     );
     const w6 = parseFloat(
-      this.configService.get('WEIGHT_QUALITY_SCORE', '0.10'),
+      this.configService.get("WEIGHT_QUALITY_SCORE", "0.10"),
     );
 
     // 1. Common tags score (Jaccard similarity)
@@ -128,7 +125,7 @@ export class FeedService {
       score += w3 * timeOverlap * 100;
 
       if (timeOverlap > 0.5) {
-        reasons.push('활동시간대 유사');
+        reasons.push("활동시간대 유사");
       }
     }
 
@@ -147,13 +144,13 @@ export class FeedService {
     // Ensure we have at least 3 reasons
     if (reasons.length < 3) {
       if (candidate.religion === myProfile.religion) {
-        reasons.push('종교 일치');
+        reasons.push("종교 일치");
       }
       if (candidate.drink === myProfile.drink) {
-        reasons.push('음주 성향 유사');
+        reasons.push("음주 성향 유사");
       }
       if (reasons.length < 3) {
-        reasons.push('프로필 적합도 높음');
+        reasons.push("프로필 적합도 높음");
       }
     }
 

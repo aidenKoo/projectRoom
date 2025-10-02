@@ -1,9 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { SurveyOption, OptionCategory } from './entities/survey-option.entity';
-import { CreateSurveyOptionDto } from './dto/create-survey-option.dto';
-import { UpdateSurveyOptionDto } from './dto/update-survey-option.dto';
+import { Injectable, NotFoundException } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { SurveyOption, OptionCategory } from "./entities/survey-option.entity";
+import { CreateSurveyOptionDto } from "./dto/create-survey-option.dto";
+import { UpdateSurveyOptionDto } from "./dto/update-survey-option.dto";
 
 @Injectable()
 export class SurveyOptionsService {
@@ -19,14 +19,14 @@ export class SurveyOptionsService {
 
   async findAll(): Promise<SurveyOption[]> {
     return this.surveyOptionRepository.find({
-      order: { category: 'ASC', sortOrder: 'ASC' },
+      order: { category: "ASC", sortOrder: "ASC" },
     });
   }
 
   async findByCategory(category: OptionCategory): Promise<SurveyOption[]> {
     return this.surveyOptionRepository.find({
       where: { category, isActive: true },
-      order: { sortOrder: 'ASC' },
+      order: { sortOrder: "ASC" },
     });
   }
 
@@ -38,7 +38,10 @@ export class SurveyOptionsService {
     return option;
   }
 
-  async update(id: number, updateDto: UpdateSurveyOptionDto): Promise<SurveyOption> {
+  async update(
+    id: number,
+    updateDto: UpdateSurveyOptionDto,
+  ): Promise<SurveyOption> {
     const option = await this.findOne(id);
     Object.assign(option, updateDto);
     return this.surveyOptionRepository.save(option);

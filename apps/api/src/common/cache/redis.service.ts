@@ -1,6 +1,11 @@
-import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { createClient, RedisClientType } from 'redis';
+import {
+  Injectable,
+  OnModuleInit,
+  OnModuleDestroy,
+  Logger,
+} from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { createClient, RedisClientType } from "redis";
 
 @Injectable()
 export class RedisService implements OnModuleInit, OnModuleDestroy {
@@ -10,8 +15,8 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   constructor(private configService: ConfigService) {}
 
   async onModuleInit() {
-    const host = this.configService.get<string>('REDIS_HOST', 'localhost');
-    const port = this.configService.get<number>('REDIS_PORT', 6379);
+    const host = this.configService.get<string>("REDIS_HOST", "localhost");
+    const port = this.configService.get<number>("REDIS_PORT", 6379);
 
     this.client = createClient({
       socket: {
@@ -20,19 +25,19 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       },
     });
 
-    this.client.on('error', (err) => {
-      this.logger.error('Redis Client Error', err);
+    this.client.on("error", (err) => {
+      this.logger.error("Redis Client Error", err);
     });
 
-    this.client.on('connect', () => {
+    this.client.on("connect", () => {
       this.logger.log(`Redis connected to ${host}:${port}`);
     });
 
     try {
       await this.client.connect();
-      this.logger.log('✅ Redis initialized successfully');
+      this.logger.log("✅ Redis initialized successfully");
     } catch (error) {
-      this.logger.error('❌ Failed to connect to Redis:', error.message);
+      this.logger.error("❌ Failed to connect to Redis:", error.message);
     }
   }
 

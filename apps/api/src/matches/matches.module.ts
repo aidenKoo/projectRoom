@@ -1,9 +1,9 @@
-import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { MatchesService } from './matches.service';
-import { MatchesController } from './matches.controller';
-import { Match } from './entities/match.entity';
-import { UsersModule } from '../users/users.module';
+import { Module } from "@nestjs/common";
+import { TypeOrmModule } from "@nestjs/typeorm";
+import { MatchesService } from "./matches.service";
+import { MatchesController } from "./matches.controller";
+import { Match } from "./entities/match.entity";
+import { UsersModule } from "../users/users.module";
 
 @Module({
   imports: [TypeOrmModule.forFeature([Match]), UsersModule],

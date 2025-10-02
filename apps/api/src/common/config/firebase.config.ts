@@ -1,17 +1,21 @@
-import * as admin from 'firebase-admin';
-import { ConfigService } from '@nestjs/config';
+import * as admin from "firebase-admin";
+import { ConfigService } from "@nestjs/config";
 
 export const initializeFirebase = (configService: ConfigService) => {
-  const projectId = configService.get<string>('FIREBASE_PROJECT_ID');
+  const projectId = configService.get<string>("FIREBASE_PROJECT_ID");
   const privateKey = configService
-    .get<string>('FIREBASE_PRIVATE_KEY', '')
-    .replace(/\\n/g, '\n');
-  const clientEmail = configService.get<string>('FIREBASE_CLIENT_EMAIL');
+    .get<string>("FIREBASE_PRIVATE_KEY", "")
+    .replace(/\\n/g, "\n");
+  const clientEmail = configService.get<string>("FIREBASE_CLIENT_EMAIL");
 
   // Skip Firebase init if credentials are not provided (for development)
   if (!projectId || !privateKey || !clientEmail) {
-    console.log('⚠️  Firebase credentials not configured. Skipping Firebase initialization.');
-    console.log('   Firebase Auth Guard will not work without proper credentials.');
+    console.log(
+      "⚠️  Firebase credentials not configured. Skipping Firebase initialization.",
+    );
+    console.log(
+      "   Firebase Auth Guard will not work without proper credentials.",
+    );
     return admin;
   }
 
@@ -23,11 +27,11 @@ export const initializeFirebase = (configService: ConfigService) => {
           privateKey,
           clientEmail,
         }),
-        storageBucket: configService.get<string>('FIREBASE_STORAGE_BUCKET'),
+        storageBucket: configService.get<string>("FIREBASE_STORAGE_BUCKET"),
       });
-      console.log('✅ Firebase initialized successfully');
+      console.log("✅ Firebase initialized successfully");
     } catch (error) {
-      console.error('❌ Failed to initialize Firebase:', error.message);
+      console.error("❌ Failed to initialize Firebase:", error.message);
     }
   }
 

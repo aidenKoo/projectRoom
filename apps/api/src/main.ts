@@ -1,9 +1,9 @@
-import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
-import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
-import { ConfigService } from '@nestjs/config';
-import { AppModule } from './app.module';
-import { initializeFirebase } from './common/config/firebase.config';
+import { NestFactory } from "@nestjs/core";
+import { ValidationPipe } from "@nestjs/common";
+import { SwaggerModule, DocumentBuilder } from "@nestjs/swagger";
+import { ConfigService } from "@nestjs/config";
+import { AppModule } from "./app.module";
+import { initializeFirebase } from "./common/config/firebase.config";
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -14,7 +14,7 @@ async function bootstrap() {
 
   // CORS
   app.enableCors({
-    origin: process.env.CORS_ORIGIN?.split(',') || '*',
+    origin: process.env.CORS_ORIGIN?.split(",") || "*",
     credentials: true,
   });
 
@@ -28,22 +28,22 @@ async function bootstrap() {
 
   // Swagger
   const config = new DocumentBuilder()
-    .setTitle('ProjectRoom API')
-    .setDescription('Dating app API - per 작업서')
-    .setVersion('1.0')
+    .setTitle("ProjectRoom API")
+    .setDescription("Dating app API - per 작업서")
+    .setVersion("1.0")
     .addBearerAuth(
       {
-        type: 'http',
-        scheme: 'bearer',
-        bearerFormat: 'JWT',
-        description: 'Firebase ID Token',
+        type: "http",
+        scheme: "bearer",
+        bearerFormat: "JWT",
+        description: "Firebase ID Token",
       },
-      'firebase',
+      "firebase",
     )
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('docs', app, document);
+  SwaggerModule.setup("docs", app, document);
 
   const port = process.env.PORT || 3000;
   await app.listen(port);

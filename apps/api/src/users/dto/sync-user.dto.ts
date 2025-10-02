@@ -1,19 +1,27 @@
-import { IsEmail, IsEnum, IsInt, IsOptional, IsString, Min, Max } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import {
+  IsEmail,
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+  Min,
+  Max,
+} from "class-validator";
+import { ApiProperty } from "@nestjs/swagger";
 
 export class SyncUserDto {
-  @ApiProperty({ example: 'john@example.com' })
+  @ApiProperty({ example: "john@example.com" })
   @IsEmail()
   email: string;
 
-  @ApiProperty({ example: 'John Doe', required: false })
+  @ApiProperty({ example: "John Doe", required: false })
   @IsOptional()
   @IsString()
   display_name?: string;
 
-  @ApiProperty({ enum: ['M', 'F', 'N'], example: 'M' })
-  @IsEnum(['M', 'F', 'N'])
-  gender: 'M' | 'F' | 'N';
+  @ApiProperty({ enum: ["M", "F", "N"], example: "M" })
+  @IsEnum(["M", "F", "N"])
+  gender: "M" | "F" | "N";
 
   @ApiProperty({ example: 1995, minimum: 1950 })
   @IsInt()
@@ -21,7 +29,7 @@ export class SyncUserDto {
   @Max(new Date().getFullYear() - 19)
   birth_year: number;
 
-  @ApiProperty({ example: 'KR-SEO', required: false })
+  @ApiProperty({ example: "KR-SEO", required: false })
   @IsOptional()
   @IsString()
   region_code?: string;

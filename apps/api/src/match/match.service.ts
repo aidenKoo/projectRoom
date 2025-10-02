@@ -1,10 +1,10 @@
-import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, LessThan } from 'typeorm';
-import { Like } from './entities/like.entity';
-import { Match } from './entities/match.entity';
-import { Recommendation } from './entities/recommendation.entity';
-import { MatchScorerService } from './match-scorer.service';
+import { Injectable } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository, LessThan } from "typeorm";
+import { Like } from "./entities/like.entity";
+import { Match } from "./entities/match.entity";
+import { Recommendation } from "./entities/recommendation.entity";
+import { MatchScorerService } from "./match-scorer.service";
 
 @Injectable()
 export class MatchService {
@@ -19,7 +19,10 @@ export class MatchService {
   ) {}
 
   // Like 생성 및 상호 매칭 확인
-  async createLike(fromUserId: string, toUserId: string): Promise<{ like: Like; match?: Match }> {
+  async createLike(
+    fromUserId: string,
+    toUserId: string,
+  ): Promise<{ like: Like; match?: Match }> {
     // 이미 좋아요 했는지 확인
     const existing = await this.likeRepository.findOne({
       where: { fromUserId, toUserId },
@@ -64,12 +67,29 @@ export class MatchService {
     return this.matchRepository.save(match);
   }
 
+  // ID로 매치 조회 (권한 확인 포함)
+  async findMatchById(matchId: string, userId: string): Promise<Match> {
+    const match = await this.matchRepository.findOne({
+      where: { id: matchId },
+    });
+
+    if (!match) {
+      throw new NotFoundException(`Match with ID ${matchId} not found`);
+    }
+
+    if (match.uidA !== userId && match.uidB !== userId) {
+      throw new ForbiddenException("You do not have access to this match");
+    }
+
+    return match;
+  }
+
   // 나의 상호 매칭 목록 조회
   async getMyMatches(userId: string): Promise<Match[]> {
     return this.matchRepository
-      .createQueryBuilder('match')
-      .where('match.uid_a = :userId OR match.uid_b = :userId', { userId })
-      .orderBy('match.created_at', 'DESC')
+      .createQueryBuilder("match")
+      .where("match.uid_a = :userId OR match.uid_b = :userId", { userId })
+      .orderBy("match.created_at", "DESC")
       .getMany();
   }
 
@@ -77,12 +97,16 @@ export class MatchService {
   async getLikesReceived(userId: string): Promise<Like[]> {
     return this.likeRepository.find({
       where: { toUserId: userId },
-      order: { createdAt: 'DESC' },
+      order: { createdAt: "DESC" },
     });
   }
 
   // 추천 목록 조회
-  async getRecommendations(userId: string, limit = 9): Promise<Recommendation[]> {
+  async getRecommendations(
+    userId: string,
+    token?: string,
+    limit = 9,
+  ): Promise<Recommendation[]> {
     // 아직 노출되지 않은 추천 조회
     let recommendations = await this.recommendationRepository.find({
       where: {
@@ -90,20 +114,20 @@ export class MatchService {
         isShown: false,
         isSkipped: false,
       },
-      order: { score: 'DESC' },
+      order: { score: "DESC" },
       take: limit,
     });
 
     // 추천이 부족하면 새로 생성
     if (recommendations.length < limit) {
-      await this.generateRecommendations(userId, limit);
+      await this.generateRecommendations(userId, token, limit);
       recommendations = await this.recommendationRepository.find({
         where: {
           userId,
           isShown: false,
           isSkipped: false,
         },
-        order: { score: 'DESC' },
+        order: { score: "DESC" },
         take: limit,
       });
     }
@@ -120,13 +144,21 @@ export class MatchService {
   }
 
   // 추천 생성 (매칭 스코어 기반)
-  async generateRecommendations(userId: string, count = 20): Promise<void> {
+  async generateRecommendations(
+    userId: string,
+    token?: string,
+    count = 20,
+  ): Promise<void> {
     // 실제로는 전체 사용자 풀에서 매칭 스코어 계산
     // 여기서는 간단한 플레이스홀더
     const candidates = await this.scorerService.getCandidates(userId, count);
 
     for (const candidate of candidates) {
-      const scoreResult = await this.scorerService.calculateScore(userId, candidate.firebase_uid);
+      const scoreResult = await this.scorerService.calculateScore(
+        userId,
+        candidate.firebase_uid,
+        token,
+      );
 
       const rec = this.recommendationRepository.create({
         userId,
@@ -142,7 +174,10 @@ export class MatchService {
   }
 
   // 스킵 처리
-  async skipRecommendation(userId: string, targetUserId: string): Promise<void> {
+  async skipRecommendation(
+    userId: string,
+    targetUserId: string,
+  ): Promise<void> {
     const rec = await this.recommendationRepository.findOne({
       where: { userId, targetUserId },
     });

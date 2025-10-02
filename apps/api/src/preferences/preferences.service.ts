@@ -1,10 +1,17 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Preference } from './entities/preference.entity';
-import { CreatePreferenceDto } from './dto/create-preference.dto';
-import { UpdatePreferenceDto } from './dto/update-preference.dto';
-import { calculateWeights, validatePreferenceItems } from './preference-weights.util';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { Preference } from "./entities/preference.entity";
+import { CreatePreferenceDto } from "./dto/create-preference.dto";
+import { UpdatePreferenceDto } from "./dto/update-preference.dto";
+import {
+  calculateWeights,
+  validatePreferenceItems,
+} from "./preference-weights.util";
 
 @Injectable()
 export class PreferencesService {
@@ -16,8 +23,13 @@ export class PreferencesService {
   /**
    * Create or update preferences for a user
    */
-  async upsert(userId: number, createPreferenceDto: CreatePreferenceDto): Promise<Preference> {
-    const existing = await this.preferenceRepository.findOne({ where: { userId } });
+  async upsert(
+    userId: number,
+    createPreferenceDto: CreatePreferenceDto,
+  ): Promise<Preference> {
+    const existing = await this.preferenceRepository.findOne({
+      where: { userId },
+    });
 
     // 선호도 랭킹 검증 및 가중치 자동 계산
     if (createPreferenceDto.items && createPreferenceDto.items.length > 0) {
@@ -28,7 +40,9 @@ export class PreferencesService {
 
       // 가중치가 제공되지 않았으면 자동 계산
       if (!createPreferenceDto.weights) {
-        createPreferenceDto.weights = calculateWeights(createPreferenceDto.items.length);
+        createPreferenceDto.weights = calculateWeights(
+          createPreferenceDto.items.length,
+        );
       }
     }
 
@@ -49,9 +63,11 @@ export class PreferencesService {
    * Get preferences for a user
    */
   async findByUserId(userId: number): Promise<Preference> {
-    const preference = await this.preferenceRepository.findOne({ where: { userId } });
+    const preference = await this.preferenceRepository.findOne({
+      where: { userId },
+    });
     if (!preference) {
-      throw new NotFoundException('Preferences not found for this user');
+      throw new NotFoundException("Preferences not found for this user");
     }
     return preference;
   }
@@ -59,11 +75,18 @@ export class PreferencesService {
   /**
    * Update preferences
    */
-  async update(userId: number, updatePreferenceDto: UpdatePreferenceDto): Promise<Preference> {
-    const existing = await this.preferenceRepository.findOne({ where: { userId } });
+  async update(
+    userId: number,
+    updatePreferenceDto: UpdatePreferenceDto,
+  ): Promise<Preference> {
+    const existing = await this.preferenceRepository.findOne({
+      where: { userId },
+    });
 
     if (!existing) {
-      throw new NotFoundException('Preferences not found. Please create preferences first.');
+      throw new NotFoundException(
+        "Preferences not found. Please create preferences first.",
+      );
     }
 
     await this.preferenceRepository.update(userId, updatePreferenceDto);
@@ -76,7 +99,7 @@ export class PreferencesService {
   async remove(userId: number): Promise<void> {
     const result = await this.preferenceRepository.delete({ userId });
     if (result.affected === 0) {
-      throw new NotFoundException('Preferences not found');
+      throw new NotFoundException("Preferences not found");
     }
   }
 }

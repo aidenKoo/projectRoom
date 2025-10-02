@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { HttpModule } from '@nestjs/axios';
+import { ConfigModule } from '@nestjs/config';
 import { MatchController } from './match.controller';
 import { MatchService } from './match.service';
 import { MatchScorerService } from './match-scorer.service';
@@ -12,7 +14,16 @@ import { Preference } from '../preferences/entities/preference.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Like, Match, Recommendation, User, Profile, Preference]),
+    TypeOrmModule.forFeature([
+      Like,
+      Match,
+      Recommendation,
+      User,
+      Profile,
+      Preference,
+    ]),
+    HttpModule,
+    ConfigModule,
   ],
   controllers: [MatchController],
   providers: [MatchService, MatchScorerService],

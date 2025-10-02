@@ -5,9 +5,9 @@ import {
   CallHandler,
   HttpException,
   HttpStatus,
-} from '@nestjs/common';
-import { Observable } from 'rxjs';
-import { RedisService } from '../cache/redis.service';
+} from "@nestjs/common";
+import { Observable } from "rxjs";
+import { RedisService } from "../cache/redis.service";
 
 @Injectable()
 export class RateLimitInterceptor implements NestInterceptor {
@@ -17,7 +17,10 @@ export class RateLimitInterceptor implements NestInterceptor {
     private readonly windowSeconds: number = 60, // 기본 60초
   ) {}
 
-  async intercept(context: ExecutionContext, next: CallHandler): Promise<Observable<any>> {
+  async intercept(
+    context: ExecutionContext,
+    next: CallHandler,
+  ): Promise<Observable<any>> {
     const request = context.switchToHttp().getRequest();
     const user = request.user;
     const ip = request.ip || request.connection.remoteAddress;
@@ -34,7 +37,7 @@ export class RateLimitInterceptor implements NestInterceptor {
       throw new HttpException(
         {
           statusCode: HttpStatus.TOO_MANY_REQUESTS,
-          message: 'Too many requests. Please try again later.',
+          message: "Too many requests. Please try again later.",
           limit: this.limit,
           windowSeconds: this.windowSeconds,
         },
@@ -45,7 +48,7 @@ export class RateLimitInterceptor implements NestInterceptor {
     // 카운트 증가
     if (currentCount === 0) {
       // 첫 요청이면 TTL 설정
-      await this.redisService.set(key, '1', this.windowSeconds);
+      await this.redisService.set(key, "1", this.windowSeconds);
     } else {
       // 이미 있으면 증가
       await this.redisService.incr(key);
