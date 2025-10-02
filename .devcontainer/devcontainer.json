@@ -1,0 +1,57 @@
+{
+  "name": "projectRoom (Flutter stable)",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "args": {
+      "FLUTTER_VERSION": "3.24.0"
+    }
+  },
+
+  // Codespaces가 어떤 플래그를 주입해도 영향 없게, 빌드 단계에서 다 끝냄.
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "lts"
+    },
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {}
+  },
+
+  "remoteUser": "vscode",
+
+  "containerEnv": {
+    "FLUTTER_HOME": "/opt/flutter",
+    "PUB_CACHE": "/home/vscode/.pub-cache"
+  },
+
+  "postCreateCommand": "bash .devcontainer/scripts/supabase-init.sh",
+
+  "forwardPorts": [3000, 5432, 8000],
+  "portsAttributes": {
+    "3000": {
+      "label": "Supabase Studio",
+      "onAutoForward": "notify"
+    },
+    "5432": {
+      "label": "PostgreSQL",
+      "onAutoForward": "silent"
+    },
+    "8000": {
+      "label": "Supabase API",
+      "onAutoForward": "notify"
+    }
+  },
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "Dart-Code.dart-code",
+        "Dart-Code.flutter",
+        "ms-vscode.vscode-typescript-next"
+      ],
+      "settings": {
+        "dart.flutterSdkPath": "/opt/flutter",
+        "dart.sdkPath": "/opt/flutter/bin/cache/dart-sdk",
+        "terminal.integrated.defaultProfile.linux": "bash"
+      }
+    }
+  }
+}

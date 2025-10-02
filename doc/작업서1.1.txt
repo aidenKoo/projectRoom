@@ -1,0 +1,903 @@
+# 소개팅 웹앱 — 가입/리서치 페이지 중심 PRD v1.0
+
+작성일: 2025-10-02 (KST)
+작성자: 프로젝트 룸
+스코프: 로그인/가입, 추천인/월별 가입코드, 공개/비공개 설문(가입 리서치 페이지), 가중치 기반 선호도 설정, 기본 데이터모델·정책·운영 플로우
+개발현황: /doc/progressLog/ 내에 *.md 파일 참조.
+
+---
+
+## 0) 제품 개요
+
+* 목적: “매칭 정교화”를 위한 고신뢰 가입 리서치(프로필+선호) 수집과 운영 편의(월별 가입코드, 추천인 관리)를 제공한다.
+* 핵심 원칙:
+
+  1. **공개/비공개 구획 명확 고지** — 사용자가 각 항목의 공개 범위를 항상 인지.
+  2. **최소 필수 + 선택 확장** — 비공개 영역은 *자신 있는 부분만* 쓰는 선택형.
+  3. **선호 Top N(≤5) 가중치** — 적게 고를수록 각 항목의 가중치가 커짐(명시적 안내).
+  4. **운영 자동화** — 매월 1일 관리자 코드 자동 생성(관리자 페이지에서 확인/재발급).
+
+---
+
+## 1) 사용자 롤 & 권한
+
+* **게스트**: 랜딩/로그인 화면 접근
+* **회원**: 가입/설문 작성, 공개 프로필 노출, 매칭 대기/탐색
+* **운영자(Admin)**: 월별 가입코드 생성/조회, 추천인 통계, 신고/차단, 필드 옵션 관리
+
+접근 행렬(요약):
+
+* 공개 프로필: 모든 회원에게 노출
+* 비공개 설문: 본인/매칭 알고리즘/운영자만 열람(고객 지원 한정)
+
+---
+
+## 2) 핵심 사용자 여정
+
+### 2.1 로그인/가입
+
+1. 로그인 화면 — **[가입]** 버튼 노출
+2. 가입 Step 0 — 이메일/패스워드(또는 소셜) 입력
+3. 가입 Step 1 — **추천인 이름** 입력(선택)
+4. 가입 Step 2 — **월별 가입코드** 입력(필수, 관리자 발급)
+5. 가입 Step 3 — **공개 영역 설문**
+6. 가입 Step 4 — **비공개 영역 설문**(선택형, “자신 있는 부분만” 작성 라벨)
+7. 가입 Step 5 — **선호도 Top ≤5 랭킹** 설정(가중치 안내)
+8. 요약 확인 → 제출 → 온보딩 완료
+
+### 2.2 가입 리서치(설문) 페이지 구조
+
+* 상단: 공개/비공개 설명 배너(아이콘 + 툴팁)
+* 탭: [공개] / [비공개] / [선호도]
+* 하단 고정 바: 진행률, 저장, 다음단계, 나중에 작성(임시 저장)
+
+---
+
+## 3) 기능 요구사항(Functional Requirements)
+
+### 3.1 인증/가입
+
+* 이메일+비밀번호 기본, 소셜 로그인(차후 옵션)
+* 월별 가입코드 유효성 검사(해당 월 코드 1개 이상 존재, 사용 제한 정책 선택형: 무제한 or 발급 수량 제한)
+* 추천인 이름 텍스트(자유 입력, 동일 이름 다수 가능)
+
+### 3.2 설문: 공개 영역 (필수)
+
+| 필드          | 타입        | 검증               | 비고                  |
+| ----------- | --------- | ---------------- | ------------------- |
+| 이름          | 문자열       | 1~20자            | 실명 권장/표기            |
+| 나이          | 숫자        | 19~60            | 범위 가드(운영자 설정화)      |
+| 키           | 숫자        | 130~220cm        | 단위 고정(cm)           |
+| 사진          | 이미지       | 1~5장, 10MB/장     | 1장은 필수(얼굴 위주 권장)    |
+| 직업          | 문자열       | 1~30자            | 프리텍스트 + 선택 옵션 혼합 가능 |
+| 학력          | 선택        | 고졸/전문/대졸/석사/박사   | 옵션 마스터 관리           |
+| MBTI        | 다중선택(리스트) | 1~2개             | 확신 낮을 시 ‘모름’ 체크     |
+| 취미          | 체크박스(복수)  | 1~5개             | 옵션 마스터 관리 + 기타 입력   |
+| 지역          | 선택 + 토글   | 시/도/구 + **자취여부** |                     |
+| 기타 장점어필(비고) | 멀티라인      | 최대 300자          | 선택                  |
+
+### 3.3 설문: 비공개 영역 (선택 — “자신 있는 부분만” 강조)
+
+| 필드     | 타입          | 검증             | 공개범위 |
+| ------ | ----------- | -------------- | ---- |
+| 재산 수준  | 라디오         | {중간, 꽤 많음, 많음} | 비공개  |
+| 외모 자신감 | 슬라이더(1~5)   | 기본 3           | 비공개  |
+| 몸매 자신감 | 슬라이더(1~5)   | 기본 3           | 비공개  |
+| 성격 설문  | 단문 선택/서술 혼합 | 최대 5문항         | 비공개  |
+| 가치관 설문 | 단문 선택/서술 혼합 | 최대 5문항         | 비공개  |
+
+> **라벨 문구 예시**: “비공개 영역은 **선택 사항**입니다. *자신 있는 부분만* 작성하세요. 이 정보는 매칭 품질 향상에만 사용되며 앱 내 공개되지 않습니다.”
+
+### 3.4 선호도 Top ≤5 랭킹(가중치)
+
+* 카테고리 예시: 나이대, 키범위, 지역, 직업군, 학력, MBTI 상성, 취미 호환, 외모스타일, 성격/가치관 키워드 등
+* 사용자는 1~5위까지 선택. **선택 수가 적을수록 각 항목 가중치 증가**(UI에 설명)
+* 기본 가중치 벡터(예):
+
+  * 5개 선택: [0.30, 0.25, 0.20, 0.15, 0.10]
+  * 4개 선택: [0.35, 0.30, 0.20, 0.15]
+  * 3개 선택: [0.45, 0.35, 0.20]
+  * 2개 선택: [0.60, 0.40]
+  * 1개 선택: [1.00]
+* 동일 우선순위 금지(드래그 정렬로 랭킹 고정)
+
+### 3.5 유효성/저장
+
+* 탭 전환 시 임시 저장(로컬+서버 Draft)
+* 필수 누락 시 하단 바 경고 및 해당 필드로 스크롤 포커스
+* 이미지 업로드 실패/용량 초과 핸들링
+
+### 3.6 관리자 기능(요약)
+
+* **월별 가입코드**: 매월 1일 00:00 KST 자동 생성(예: `2025-10-AB12CD`), 상태(활성/비활성), 발급 수량 제한(옵션), 수동 재발급
+* 추천인 리포트: 추천인 이름별 가입자 수, 전환율
+* 설문 옵션 마스터: 취미/직업군/학력 등 옵션 CRUD
+
+---
+
+## 4) 데이터 모델(초안)
+
+### 4.1 테이블 목록
+
+* `auth.users` (플랫폼 표준)
+* `profiles_public` — 공개 프로필
+* `profiles_private` — 비공개 설문(민감)
+* `preference_rankings` — 선호 Top N 랭킹
+* `survey_options` — 취미/직업/학력 등 마스터
+* `admin_monthly_codes` — 월별 가입코드
+* `referrals` — 추천인 입력 로그(문자열 기반)
+* `audit_logs` — 주요 변경/접근 로깅
+
+### 4.2 스키마 예시 (요약)
+
+**profiles_public**
+
+* user_id (PK, FK auth)
+* name (text, not null)
+* age (int, not null)
+* height_cm (int, not null)
+* job (text)
+* education (enum)
+* mbti (text[])
+* hobbies (text[])
+* region_code (text)
+* is_living_alone (bool)
+* bio_highlight (text)
+* photos (text[]) — 저장키/URL
+* created_at/updated_at
+
+**profiles_private** (민감/비공개)
+
+* user_id (PK)
+* wealth_level (enum: mid, quite_high, high)
+* look_confidence (int 1~5)
+* body_confidence (int 1~5)
+* personality_answers (jsonb)
+* values_answers (jsonb)
+* created_at/updated_at
+
+**preference_rankings**
+
+* user_id (PK)
+* items (jsonb) — 예: [{rank:1, type:"age_range", value:"27-33"}, ...]
+* weights (jsonb) — 예: [0.45,0.35,0.20]
+* created_at/updated_at
+
+**admin_monthly_codes**
+
+* id (uuid)
+* code (text unique)
+* month (date: YYYY-MM-01)
+* max_uses (int, null=무제한)
+* used_count (int)
+* is_active (bool)
+* created_at
+
+**referrals**
+
+* id (uuid)
+* user_id (FK)
+* referrer_name (text)
+* created_at
+
+### 4.3 인덱스/제약
+
+* `profiles_public(age, height_cm, region_code)` — 탐색/매칭용
+* `admin_monthly_codes(month, is_active)` — 검증용
+
+---
+
+## 5) 매칭 점수 설계(초안)
+
+> 가입 리서치 기반의 “탐색/추천” 단계에서 활용(메신저는 별도 범위)
+
+### 5.1 점수 구성
+
+`total_score = Σ (w_i * s_i)`
+
+* `w_i`: 사용자 선호 랭킹에서 유도된 가중치(§3.4)
+* `s_i`: 각 선호 항목의 유사도 점수(0~1)
+
+### 5.2 유사도 정의 예시
+
+* 나이대: 선호 범위 내 완전일치 1.0, 경계±1년 0.8, 이탈 시 선형 감쇠
+* 키범위: 범위 중심 근접 가중(거리 기반 가우시안)
+* 지역: 동일 도시 1.0, 인접권 0.7, 타권역 0.3
+* 직업군/학력/취미: 교집합 비율(Jaccard)
+* MBTI: 미리 정의된 상성 매트릭스(예: 동일 성향 0.8, 보완 성향 1.0, 상반 0.6)
+* 성격/가치관: 키워드 매핑 후 코사인 유사도
+
+### 5.3 보정항목
+
+* **신뢰보정(Confidence Boost)**: 본인 **외모/몸매 자신감**이 높은 경우, 상대 선호에 해당 항목의 가시성/가중 반영(예: 최대 +5%)
+* **정보결핍 패널티**: 공개 필수값 누락/모호(예: MBTI ‘모름’) 시 해당 항목 `s_i` 하향
+* **콜드스타트**: 데이터 적은 신규회원은 지역/연령 같은 베이스 항목 비중을 임시 상향(운영자 튜닝)
+
+---
+
+## 6) 관리자(운영) 기능
+
+* 월별 코드 자동 생성(크론/백엔드 스케줄러)
+
+  * 포맷 예: `YYYY-MM-<6자리 영숫자>`
+  * `max_uses` 전략: 무제한 or 제한(마케팅 캠페인 시)
+  * 코드 활성/비활성 토글, 수동 재발급
+* 추천인 통계 대시보드
+
+  * 상위 추천인, 월별 추이, 전환율
+* 옵션 마스터 관리
+
+  * 취미/직업군/학력/지역코드 CRUD
+
+---
+
+## 7) 정책: 보안/개인정보/접근제어
+
+* **RLS (Row-Level Security)**: `profiles_private`는 본인과 서버 측 매칭 서비스(Edge Function)만 접근. 운영자 열람은 감사로그 필수.
+* **암호화**: 비공개 필드 컬럼 단위 암호화(KMS) 또는 앱 레벨 암호화 고려
+* **로그/감사**: 비공개 데이터 조회/변경 시 `audit_logs`에 사유/주체 기록
+* **약관/동의**: 공개/비공개 처리 목적, 보관기간, 3자 제공 없음 명시
+
+---
+
+## 8) UI/UX 상세(카피 & 상호작용)
+
+* 상단 배너(공개/비공개):
+
+  * “**공개영역**은 다른 사용자에게 보여집니다.”
+  * “**비공개영역**은 매칭 품질 향상에만 사용되며 앱에 공개되지 않습니다. *자신 있는 부분만* 작성하세요.”
+* 선호도 안내 텍스트:
+
+  * “최대 5가지까지 **중요도 순**으로 선택하세요. **적게 선택할수록** 각 항목의 **가중치가 커집니다.**”
+* 입력 패턴
+
+  * MBTI: 다중선택 + 툴팁(“모르면 ‘모름’을 선택”)
+  * 취미: 체크박스 + ‘기타’ 프리텍스트
+  * 사진: 1장 필수, 즉시 미리보기, 가이드라인(얼굴 정면·밝은 사진)
+  * 진행률/저장: 하단 고정 CTA(저장 후 다음)
+
+---
+
+## 9) API/서버(예시; Supabase 전제)
+
+* Edge Functions
+
+  * `POST /validate-monthly-code` — 월 코드 검증 및 사용 카운트 증가(옵션)
+  * `POST /generate-monthly-code` — 관리자 전용(스케줄러 호출)
+* RLS 정책 샘플
+
+  * `profiles_public`: `user_id = auth.uid()`에 대해 `INSERT/UPDATE` 허용, `SELECT`는 전체(익명 제외)
+  * `profiles_private`: `user_id = auth.uid()`만 `SELECT/UPSERT`, Admin role만 함수 경유 열람
+
+---
+
+## 10) 테스트 시나리오 체크리스트
+
+* [ ] 월초 00:00 KST 코드 생성/활성화 확인
+* [ ] 코드를 입력하지 않으면 가입 진행 불가
+* [ ] 잘못된 코드/만료 코드 에러 처리
+* [ ] 공개 필수 필드 누락 시 진행 불가
+* [ ] 비공개 항목 미작성 시 문제 없음(라벨 노출 확인)
+* [ ] 선호 1~5개 선택 시 가중치 벡터 올바르게 반영
+* [ ] 사진 업로드 제약(개수/용량) 준수
+* [ ] 임시 저장/복구 정상 동작
+* [ ] RLS/감사로그 동작
+
+---
+
+## 11) 마일스톤(제안)
+
+* M0: 데이터모델/정책 확정(오늘 문서)
+* M1: 가입/로그인+코드 검증+추천인 입력(3~5일)
+* M2: 공개/비공개 설문 UI & 저장(5~7일)
+* M3: 선호 랭킹/가중치 반영 및 미리보기(3일)
+* M4: Admin 페이지(코드/옵션/리포트)(5일)
+* M5: 매칭 점수 기본 로직(탐색용 API) 연결(5일)
+
+---
+
+## 12) 부록 — 샘플 JSON 페이로드
+
+```json
+{
+  "public": {
+    "name": "홍길동",
+    "age": 29,
+    "height_cm": 176,
+    "job": "데이터 엔지니어",
+    "education": "대졸",
+    "mbti": ["INTJ"],
+    "hobbies": ["테니스", "등산"],
+    "region_code": "SEOUL_GANGNAM",
+    "is_living_alone": true,
+    "bio_highlight": "책임감 강하고 활동적",
+    "photos": ["public/profiles/uid/photo1.jpg"]
+  },
+  "private": {
+    "wealth_level": "quite_high",
+    "look_confidence": 4,
+    "body_confidence": 3,
+    "personality_answers": {"intro_extro": "중간", "schedule": "규칙적"},
+    "values_answers": {"family": "중요", "career": "매우 중요"}
+  },
+  "preferences": {
+    "items": [
+      {"rank": 1, "type": "age_range", "value": "27-33"},
+      {"rank": 2, "type": "region", "value": ["SEOUL", "GWANGGYO"]},
+      {"rank": 3, "type": "hobby_overlap", "value": ["테니스", "등산"]}
+    ],
+    "weights": [0.45, 0.35, 0.20]
+  },
+  "referral": {"name": "김프로"},
+  "monthly_code": "2025-10-AB12CD"
+}
+```
+
+---
+
+## 13) 다음 단계(요청사항)
+
+1. 취미/직업군/지역 코드 마스터 후보 리스트 확정
+2. 성격/가치관 문항 5×2 세트 초안 리뷰
+3. 선호 카테고리(선택지 풀) 확정 및 가중치 벡터 잠금
+4. Admin 코드 정책(수량 제한 여부) 결정
+
+---
+
+# 5) 매칭 알고리즘 — 연구 기반 보정 로직(확장)
+
+### 5.1 점수식(확장)
+
+* 기본: `total = Σ (w_i * s_i)`
+* 보정 계수:
+
+  * 인지유사성 배지(Shared Bits): `s_i' = s_i + α * badges_count` (α=0.03~0.07)
+  * 상호성(Reciprocity): `reciprocity = I(like_from_them | view>=X | dwell>=Y)` → γ=0.05~0.15 범위 가산
+  * 대화 턴테이킹: 첫 24h 내 3문3답 완주 시 δ=0.03 가산
+  * 노출 제약/신선도: 후보 재노출 가산 ε=0.01(최대 1회), 72h 썸네일 리마인드만 허용
+* 최종: `total' = β*Σ(w_i * s_i') + γ*reciprocity + δ*turn_taking + ε*exposure`
+* 추천 카드 수 N: 최근 3일 패스율/체류시간 기반 5~9 자동 튜닝
+
+### 5.2 추천 파이프라인
+
+1. 하드필터: 코드검증·차단·거리(예: 50km)·연령법적 범위
+2. 베이스 스코어: 동류성(연령/지역/교육) 0.5~0.6 비중
+3. 인지유사성: 취미/가치관/라이프스타일 공통 키워드 추출 → 상단 배지 1~3개 생성
+4. 상호성·행동: 나를 본/찜한 유저 우선 랭킹상승(시간감쇠)
+5. 재노출 제약: 동일 후보 하루 1회, 72h 뒤 썸네일 1회 재노출 후 종료
+
+### 5.3 AB 실험 슬롯(서버 변수)
+
+* `AB_CARD_COUNT ∈ {5,9,15}`
+* `AB_BADGE_STYLE ∈ {off, one_line, triple_badge}`
+* `AB_RECIP_SIGNAL ∈ {off, toast_soft, banner_hard}`
+* `AB_TURNTAKING_WIDGET ∈ {off, on}`
+* `AB_AUTO_REWEIGHT ∈ {weekly, off}`
+
+---
+
+# 6) 관리자 웹앱(모니터링 & 운영)
+
+## 6.1 페이지 구조
+
+1. **대시보드**
+
+   * KPI: 신규가입/일, 유효코드 사용률, 상호매칭률, 첫메시지 개시율, 10턴 도달률, 언매치율, 프로필 신고건수
+   * 퍼널: 노출→프로필뷰→좋아요→상호매칭→첫메시지→3문3답완주
+   * 실험 현황: AB 그룹별 성과 테이블/그래프
+2. **사용자 관리**
+
+   * 회원 검색(이메일/이름/지역/상태), 공개/비공개 프로필 뷰(접근 시 감사로그)
+   * 강제 비활성/차단, 신고 이력, 대화 요약(규정 범위)
+3. **매칭 현황**
+
+   * 추천 큐 모니터(유저별 추천셋/스코어분해), 재현 버튼(동일 시드로 재계산)
+   * 상호매칭 대기열, 재노출 큐(72h 썸네일 대상)
+4. **콘텐츠/이미지**
+
+   * 사진 메타(썸네일 해시/너비·높이/NSFW 플래그) 확인 및 블라인드 처리
+5. **가입코드 관리**
+
+   * 월별 코드 자동생성 로그, 수동 재발급, 사용량 제한, 활성/비활성
+6. **리스트/옵션 마스터**
+
+   * 취미/직업군/학력/지역 옵션 CRUD(버전 기록)
+7. **실험(AB) 콘솔**
+
+   * 변수 편집/롤백, 그룹 비율, 통계 스냅샷(베이즈/지표)
+8. **로그/감사**
+
+   * 비공개 데이터 열람 사유 기록, 관리자 행동 로그
+
+## 6.2 핵심 지표 정의(예)
+
+* 상호매칭률 = 상호 like / 양방향 후보쌍
+* 첫메시지 전환율 = 상호매칭 중 첫 메시지 송신 비율
+* 3문3답 완주율 = 대화 시작 후 24h 내 교차 3턴 달성 비율
+* 언매치율 = 상호매칭 후 72h 내 언매치 비율(스팸 탐지 참고)
+
+## 6.3 관리자 권한/감사
+
+* 역할: `admin`, `support`, `analyst`
+* 비공개 열람은 사유 필수 → `audit_logs`
+
+---
+
+# 7) 시스템 아키텍처(웹 동작 기준)
+
+* **클라이언트**: 웹(Flutter Web 또는 React)
+* **인증**: Firebase Auth(Email/Apple/Google)
+* **스토리지**: Firebase Storage(SDK로 클라 직접 업로드)
+
+  * 권한: 로그인 사용자의 `/users/{uid}` 경로 쓰기 허용, 공개 썸네일은 읽기 허용(정책 분리)
+* **백엔드(API)**: (택1) **NestJS/Express** 또는 **FastAPI**
+
+  * 역할: 비즈니스 로직, 권한검사, 데이터 정합성, 매칭/실험, 관리자 API
+  * Firebase ID Token 검증(관리자 SDK/REST)
+* **DB**: MariaDB(RDS/자체)
+
+  * 엔터티: 사용자/프로필(공개·비공개)/선호/코드/추천큐/좋아요/매칭/대화/메시지/신고/결제메타/AB/로그
+* **서버리스 후처리(선택)**: Cloud Functions for Firebase
+
+  * 썸네일 생성, NSFW 필터, 해시/메타 생성 → API로 MariaDB 반영
+
+---
+
+# 8) API 사양(요약)
+
+## 8.1 인증/유틸
+
+* `POST /auth/verify` — Firebase ID Token 검증
+* `GET  /healthz` — 헬스 체크
+
+## 8.2 프로필/설문
+
+* `GET  /profiles/public/:uid`
+* `PUT  /profiles/public`
+* `GET  /profiles/private/:uid` (admin/support 전용)
+* `PUT  /profiles/private` (본인만)
+* `PUT  /preferences` — Top≤5 랭킹+가중치 저장
+
+## 8.3 가입 코드/추천인
+
+* `POST /codes/validate` — {code} → {valid, month, remaining}
+* `POST /admin/codes/generate` — 월초 자동/수동
+* `GET  /admin/codes` — 페이지네이션 목록
+* `POST /referrals` — 추천인 이름 기록
+
+## 8.4 매칭/추천
+
+* `GET  /match/recommendations` — 후보 리스트(스코어 분해 포함)
+* `POST /match/like` — {target_id}
+* `GET  /match/mutuals` — 상호매칭 목록
+* `POST /match/skip` — 스킵 이벤트(학습용)
+
+## 8.5 대화/메시지
+
+* `POST /conversations` — 상호매칭 이후 개설
+* `GET  /conversations/:id/messages`
+* `POST /conversations/:id/messages`
+
+## 8.6 관리자
+
+* `GET  /admin/users` — 검색/필터/페이징
+* `GET  /admin/users/:uid` — 공개/비공개 요약(감사로그)
+* `GET  /admin/match/queue` — 추천 큐/점수 분해
+* `GET  /admin/metrics` — KPI/퍼널/AB 결과
+* `POST /admin/options` — 옵션 마스터 CRUD
+* `POST /admin/moderation` — 이미지 블라인드/NSFW 처리
+
+### 8.7 공통 규약
+
+* 헤더: `Authorization: Bearer <Firebase ID Token>`
+* 응답: `{ ok: boolean, data?: any, error?: {code, message} }`
+
+---
+
+# 9) MariaDB 스키마(초안)
+
+```sql
+CREATE TABLE users (
+  uid VARCHAR(64) PRIMARY KEY,
+  email VARCHAR(255) UNIQUE,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE profiles_public (
+  uid VARCHAR(64) PRIMARY KEY,
+  name VARCHAR(40) NOT NULL,
+  age TINYINT UNSIGNED NOT NULL,
+  height_cm SMALLINT UNSIGNED NOT NULL,
+  job VARCHAR(60),
+  education ENUM('고졸','전문','대졸','석사','박사'),
+  mbti JSON,
+  hobbies JSON,
+  region_code VARCHAR(40),
+  is_living_alone BOOLEAN,
+  bio_highlight VARCHAR(300),
+  photos JSON,
+  updated_at DATETIME,
+  FOREIGN KEY (uid) REFERENCES users(uid)
+);
+
+CREATE TABLE profiles_private (
+  uid VARCHAR(64) PRIMARY KEY,
+  wealth_level ENUM('mid','quite_high','high'),
+  look_confidence TINYINT,
+  body_confidence TINYINT,
+  personality JSON,
+  values JSON,
+  updated_at DATETIME,
+  FOREIGN KEY (uid) REFERENCES users(uid)
+);
+
+CREATE TABLE preferences (
+  uid VARCHAR(64) PRIMARY KEY,
+  items JSON,   -- [{rank,type,value}]
+  weights JSON, -- [..]
+  updated_at DATETIME,
+  FOREIGN KEY (uid) REFERENCES users(uid)
+);
+
+CREATE TABLE monthly_codes (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  code VARCHAR(32) UNIQUE,
+  month DATE,
+  max_uses INT NULL,
+  used_count INT DEFAULT 0,
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE referrals (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  uid VARCHAR(64),
+  referrer_name VARCHAR(80),
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (uid) REFERENCES users(uid)
+);
+
+CREATE TABLE likes (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  from_uid VARCHAR(64),
+  to_uid VARCHAR(64),
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_like (from_uid, to_uid)
+);
+
+CREATE TABLE matches (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  uid_a VARCHAR(64),
+  uid_b VARCHAR(64),
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_pair (LEAST(uid_a,uid_b), GREATEST(uid_a,uid_b))
+);
+
+CREATE TABLE conversations (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  match_id BIGINT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (match_id) REFERENCES matches(id)
+);
+
+CREATE TABLE messages (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  conv_id BIGINT,
+  sender_uid VARCHAR(64),
+  body TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (conv_id) REFERENCES conversations(id)
+);
+
+CREATE TABLE photo_meta (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  uid VARCHAR(64),
+  path VARCHAR(255),
+  width INT, height INT,
+  hash VARCHAR(64),
+  nsfw BOOLEAN DEFAULT FALSE,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE ab_assignments (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  uid VARCHAR(64),
+  experiment VARCHAR(40),
+  variant VARCHAR(20),
+  assigned_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE audit_logs (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  actor_uid VARCHAR(64),
+  action VARCHAR(80),
+  target VARCHAR(80),
+  reason VARCHAR(255),
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+**인덱스 예시**
+
+* `profiles_public(age, height_cm, region_code)`
+* `likes(to_uid, created_at)` / `matches(created_at)`
+* `messages(conv_id, created_at)`
+
+---
+
+# 10) 스토리지 정책(Firebase Storage)
+
+* 경로: `/users/{uid}/orig/{uuid}.jpg`, `/users/{uid}/thumb/{uuid}.jpg`
+* 보안 규칙 요약:
+
+  * 인증 사용자만 자신의 `/users/{uid}/**` 쓰기 가능
+  * 썸네일 읽기 공개(선택), 원본은 토큰 기반 제한(선택)
+
+---
+
+# 11) 서버리스 후처리(선택)
+
+* 트리거: Storage 업로드 완료 → Cloud Functions
+* 작업: 썸네일 생성, NSFW 검사, 해시·메타 생성
+* 결과: `photo_meta` 테이블 업데이트(API 호출)
+
+---
+
+# 12) 인증/권한
+
+* 클라: Firebase Auth → ID Token 획득
+* 서버: 관리자 SDK/REST로 토큰 검증, 역할 클레임(`role: admin|support|analyst|user`)
+* 비공개 열람 및 관리자 행위는 모두 `audit_logs` 기록
+
+---
+
+# 13) 운영/관측성
+
+* 로깅: API 구조화 로그(JSON), 사용자ID/요청ID 추적
+* 트레이싱: OpenTelemetry(선택)
+* 메트릭: 요청수/오류율/지연·DB 쿼리 시간/매칭 계산 시간
+* 경보: 오류율, 상호매칭률 급락, 메시지 10턴 도달률 급락
+
+---
+
+# 14) 프런트 구조(예시)
+
+* 라우팅
+
+  * `/login`, `/signup`, `/research`(공개/비공개/선호 탭)
+  * `/discover`(추천 카드), `/chat`, `/profile`
+  * `/admin`(대시보드/사용자/매칭/코드/옵션/실험/로그)
+* 컴포넌트
+
+  * Shared Bits 배지, 호감 신호 토스트, 3문3답 위젯
+
+---
+
+# 15) 코드 스캐폴드(클로드 자동개발 친화)
+
+## 15.1 NestJS(선호 시) 구조
+
+```
+server/
+  src/
+    main.ts
+    app.module.ts
+    auth/
+      auth.module.ts auth.controller.ts auth.service.ts firebase.strategy.ts
+    profiles/
+      public.controller.ts private.controller.ts profiles.service.ts dto/
+    match/
+      match.controller.ts match.service.ts scorer.ts ab.ts
+    admin/
+      admin.controller.ts admin.service.ts
+    common/
+      guards/roles.guard.ts interceptors/logging.interceptor.ts
+    prisma/ (또는 knex)  orm.service.ts schema.sql
+```
+
+## 15.2 FastAPI(대안) 구조
+
+```
+server/
+  app/
+    main.py
+    deps.py (firebase verify)
+    routers/
+      auth.py profiles.py match.py admin.py
+    services/
+      scorer.py ab.py
+    models/ (SQLAlchemy) schemas/
+```
+
+## 15.3 공통 DTO 예시
+
+```ts
+// PUT /preferences
+interface PreferenceDTO {
+  items: { rank: 1|2|3|4|5; type: string; value: any }[];
+  weights: number[];
+}
+```
+
+---
+
+# 16) 작업현황.txt 규칙(클로드 자동기록)
+
+* 파일 경로: 프로젝트 루트 `/작업현황.txt`
+* 포맷(예):
+
+```
+[2025-10-02 21:10 KST] STATUS: TODO → DOING
+- 작업: NestJS 스캐폴드 생성, /auth/verify, /profiles/public 초안
+- 커밋: a1b2c3d
+- 실행: npm i, npx nest new server
+- 이슈: Firebase Admin SDK 권한 오류 → 서비스 계정 키 갱신 필요
+- 결정: MariaDB는 RDS, 연결 풀 10, 타임존 +09:00
+
+[2025-10-02 23:40 KST] STATUS: DOING → DONE
+- 작업: /codes/validate, monthly_codes 마이그레이션
+- 커밋: d4e5f6g
+- 실험: AB_CARD_COUNT=5로 기본값 설정
+```
+
+* 상태 토큰: `TODO/DOING/DONE/BLOCKED`
+* 각 기록은 **KST 타임스탬프**, 작업/커밋/명령/이슈/결정 포함
+
+---
+
+# 17) 초기 백로그(실행 순서)
+
+1. DB 마이그레이션 스크립트(MariaDB)
+2. 인증 미들웨어(Firebase 토큰 검증)
+3. `/profiles/public|private|preferences` CRUD
+4. `/codes/validate` 및 월초 자동 생성 잡
+5. 매칭 스코어러(동류성 + 보정 계수) & `/match/recommendations`
+6. 좋아요/상호매칭 & 대화 생성/메시지 API
+7. 관리자 대시보드(KPI/퍼널/AB/코드/옵션/로그)
+8. Cloud Functions: 썸네일/NSFW → `photo_meta` 반영
+
+---
+
+# 18) 보안/개인정보(요약)
+
+* 데이터 보존정책/탈퇴/정산 이력(결제메타) 별도 보관기간 명시
+
+---
+
+# 19) UI/UX 가이드 — Instagram-like 톤앤매너(웹 중심)
+
+## 19.1 톤앤매너 키워드
+
+* **미니멀 · 고급감 · 시크**: 여백 중심, 텍스트 절제, 사진 우선.
+* **사진 중심 카드(feed)** + **상단 스토리형 썸네일(선택)**, **DM 유사 메시지**.
+* **부드러운 모션**: 180–240ms, 과하지 않은 이징(`ease-in-out`).
+
+## 19.2 디자인 토큰(예시)
+
+* 컬러 (라이트 테마)
+
+  * `--bg`: #0B0B0C (딥 블랙) / **라이트**: #FFFFFF
+  * `--surface`: #121214 / **라이트**: #F7F7F8
+  * `--text-primary`: #FFFFFF / **라이트**: #16181C
+  * `--text-secondary`: #A0A3A7 / **라이트**: #6B7280
+  * `--accent`: #4B8BFF (포커스/CTA)
+  * `--danger`: #FF5C5C, `--success`: #2ECC71, `--warning`: #FFB020
+  * 구분선: #2A2B2E (1px, 투명도 40%)
+* 타이포그래피
+
+  * 한글 기본: **Pretendard**(또는 **SUIT**), 서브: Inter
+  * H1 24/32, H2 20/28, Body 15/22, Caption 13/18 (px/line-height)
+  * 자간 -0.2%~0%
+* 스페이싱 스케일: 4-8-12-16-20-24-32-40
+* 코너: 12–20px(카드/썸네일 16px 권장)
+* 섀도: `y=8, blur=24, alpha=12%` (hover 시 16/32/16%)
+
+## 19.3 핵심 컴포넌트
+
+1. **탑바(Top App Bar)**
+
+   * 좌측 로고(워드마크), 중앙 검색(라이트박스), 우측 아이콘(알림/메시지/프로필)
+   * 스크롤 다운 시 축소, 업 시 나타남
+2. **스토리/하이라이트(선택)**
+
+   * 원형 썸네일(64px), 외곽선 그라데이션(미세), hover 시 그림자
+   * 기능: 공지/이벤트/AB 실험용 메시지 노출 가능
+3. **피드 카드(프로필 추천)**
+
+   * 상단: 아바타·이름·지역 뱃지 / 우측 더보기(…)
+   * 본문: **대표 사진**(16:9·4:5 자동 크롭 대응) + 슬라이드(최대 5장)
+   * 하단 액션: ♥ 좋아요(더블탭 지원), ✕ 패스, 공유(링크), 저장(북마크)
+   * **Shared Bits 배지**: 카드 상단 또는 사진 하단에 1~3개(아이콘+키워드)
+   * 이유 설명: “왜 이 추천인가요” 1줄(접기/펼치기)
+4. **디스커버(탐색 그리드)**
+
+   * 3열 masonry(데스크톱 4열), hover 시 살짝 확대(1.02)
+   * 빠른 Like(하트 오버레이)
+5. **프로필 상세(모달/페이지)**
+
+   * 갤러리 상단 고정, 좌/우 네비, 하단 기본정보(나이·키·직업·학력)
+   * 탭: **공개 정보**, **공통점**, **자기소개**
+6. **DM(메시지)**
+
+   * 좌측: 대화 리스트(최근순 + 직원뱃지/신고상태 표시)
+   * 우측: 말풍선(좌우 정렬), 이미지/링크 미리보기, **3문3답 위젯** 상단 고정(매칭 후 24h)
+7. **액션 시트**
+
+   * 신고/차단/공유/링크복사/피드백(추천 품질)
+8. **알림(Toast/Inbox)**
+
+   * 상단 토스트: “당신을 긍정적으로 본 사람이 있어요”(소프트)
+   * 인박스: 상대 활동 묶음(일괄 읽음)
+
+## 19.4 상호작용(마이크로 인터랙션)
+
+* **더블탭 하트**: 220ms 팝 하트 애니메이션(스케일 1→1.15→1)
+* 스와이프: 데스크톱은 버튼 우선, 모바일/태블릿은 좌우 스와이프 지원
+* 스켈레톤 로딩: 카드 프레임+아바타+텍스트 바 3줄, 1.2초 셰이머
+* 이미지 로딩: 저해상도 프리뷰(LQIP) → 선명 이미지 페이드(180ms)
+
+## 19.5 접근성/국제화
+
+* 명도비: 텍스트 대비 4.5:1 이상(보조 텍스트 3:1)
+* 키보드 내비: `Tab` 포커스 링 2px(`--accent`)
+* ARIA: 카드 그룹 role, 액션 버튼 라벨(좋아요/취소), 모달 `aria-modal="true"`
+* 다국어: 날짜·거리 단위, MBTI/학력 라벨 번역 테이블 분리
+
+## 19.6 반응형 브레이크포인트
+
+* 모바일 < 640px: 1열 피드, 하단 탭바(홈/탐색/알림/메시지/프로필)
+* 태블릿 641–1024px: 2열, 좌측 고정 내비
+* 데스크톱 > 1024px: 3열 피드 + 우측 추천 사이드바
+
+## 19.7 콘텐츠 가이드(사진)
+
+* 권장: 자연광, 상반신 60–80%, 고해상도(최소 1080px), 과도한 필터 금지
+* 금지: 워터마크, QR, 연락처 노출, 타인 초상권 침해
+
+## 19.8 관리자 UI 톤앤매너
+
+* 동일 폰트/컬러 체계, **데이터 밀도↑**
+* 카드형 KPI + 라인 차트(7/30일), 테이블은 고정 헤더·가로 스크롤·행 hover 강조
+* 상태 Pill: success/neutral/warn/danger(위 토큰 색상 사용)
+
+## 19.9 컴포넌트 명세(개발 핸드오프)
+
+* 버튼: Primary(Accent/White), Ghost, IconButton(40px)
+* 입력: Underline 스타일(포커스 시 accent line), 에러 메시지 12px
+* 배지: Shared Bits(아이콘+키워드, 회색 배경 #1C1D21, 라이트에선 #EEF2F6)
+* 카드: `border:1px solid rgba(255,255,255,0.06)` (라이트: rgba(22,24,28,0.08))
+
+## 19.10 Flutter Web 구현 힌트
+
+* 테마: `ThemeData(brightness: dark, fontFamily: 'Pretendard', colorScheme: ColorScheme.fromSeed(seedColor: accent))`
+* 스켈레톤: `Shimmer` 패키지(또는 커스텀), `AnimatedSwitcher`로 카드 교체
+* Masonry: `flutter_staggered_grid_view`
+* 이미지: `FadeInImage.memoryNetwork`(LQIP) + `InteractiveViewer`(핀치줌)
+* 제스처: `GestureDetector` 더블탭 하트, `Dismissible` 스와이프
+* 상태관리: Riverpod/Bloc 택1, 라우팅 go_router
+
+## 19.11 React(대안) 구현 힌트
+
+* 스타일: Tailwind + shadcn/ui + lucide-react 아이콘
+* 컴포넌트: Card, Sheet(모달), Toast, Tooltip, Dialog, Tabs
+* 애니메이션: Framer Motion (카드 페이드/스케일)
+* Masonry: `react-masonry-css`
+
+## 19.12 샘플 피드 카드 구조(JSON)
+
+```json
+{
+  "id": "rec_1729",
+  "user": {"uid": "u_1", "name": "Aiden", "region": "SEOUL"},
+  "photos": ["/thumb/u_1/p1.jpg", "/thumb/u_1/p2.jpg"],
+  "shared_bits": ["🎾 Tennis", "☕ Cafe", "📍Gangnam"],
+  "why": "취미 2개 일치 · 인접 지역",
+  "actions": {"like": true, "pass": true, "save": true}
+}
+```
+
+## 19.13 오류 상태 카피
+
+* 피드 없음: “잠시 후 더 좋은 추천을 준비 중이에요.”
+* 네트워크 오류: “연결이 불안정해요. 다시 시도할까요?” [재시도]
+* DM 없음: “좋아요가 오면 대화가 시작돼요.”

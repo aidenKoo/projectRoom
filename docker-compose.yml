@@ -1,0 +1,107 @@
+version: '3.8'
+
+services:
+  # MariaDB (per 작업서: NestJS + MariaDB)
+  mariadb:
+    image: mariadb:11
+    container_name: projectroom-mariadb
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: projectroom
+      MYSQL_USER: projectroom
+      MYSQL_PASSWORD: projectroom
+    ports:
+      - "3306:3306"
+    volumes:
+      - mariadb-data:/var/lib/mysql
+      - ./docker/mariadb/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+
+  # Redis (per 작업서: 피드 캐시, 레이트리밋, 후보 풀)
+  redis:
+    image: redis:7-alpine
+    container_name: projectroom-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - app-network
+
+  # NestJS Backend (will be built separately)
+  nestjs:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    container_name: projectroom-nestjs
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      DATABASE_HOST: mariadb
+      DATABASE_PORT: 3306
+      DATABASE_USER: projectroom
+      DATABASE_PASSWORD: projectroom
+      DATABASE_NAME: projectroom
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID}
+      FIREBASE_PRIVATE_KEY: ${FIREBASE_PRIVATE_KEY}
+      FIREBASE_CLIENT_EMAIL: ${FIREBASE_CLIENT_EMAIL}
+    ports:
+      - "3001:3000"
+    depends_on:
+      mariadb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./apps/api:/app
+      - /app/node_modules
+    networks:
+      - app-network
+
+  # Adminer for database management
+  adminer:
+    image: adminer:latest
+    container_name: projectroom-adminer
+    ports:
+      - "8081:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: mariadb
+      ADMINER_DESIGN: pepa-linha
+    depends_on:
+      - mariadb
+    networks:
+      - app-network
+
+  # RedisInsight for Redis management
+  redis-insight:
+    image: redis/redisinsight:latest
+    container_name: projectroom-redis-insight
+    ports:
+      - "5540:5540"
+    volumes:
+      - redis-insight-data:/data
+    networks:
+      - app-network
+
+volumes:
+  mariadb-data:
+  redis-data:
+  redis-insight-data:
+
+networks:
+  app-network:
+    driver: bridge
