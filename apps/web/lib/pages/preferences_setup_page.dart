@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../services/api_service.dart';
 
 class PreferenceItem {
   final String type;

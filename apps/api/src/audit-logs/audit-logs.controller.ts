@@ -1,4 +1,5 @@
-import { Controller, Get, Query } from "@nestjs/common";
+import { Controller, Get, Query, Param, ParseIntPipe } from "@nestjs/common";
+import { AuditAction } from "./entities/audit-log.entity";
 import { AuditLogsService } from "./audit-logs.service";
 
 @Controller("audit-logs")

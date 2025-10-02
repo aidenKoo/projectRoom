@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../services/api_service.dart';
 import '../services/chat_service.dart';
 
 final matchDetailsProvider = FutureProvider.autoDispose.family<Map<String, dynamic>, String>((ref, matchId) {
