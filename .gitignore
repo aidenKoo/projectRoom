@@ -74,3 +74,10 @@ yarn-error.log*
 .DS_Store
 Thumbs.db
 memo
+
+# secrets
+.env
+*.key
+*.pem
+memo
+*.env
