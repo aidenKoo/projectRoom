@@ -10,6 +10,7 @@ import { Match } from './entities/match.entity';
 import { Recommendation } from './entities/recommendation.entity';
 import { User } from '../users/entities/user.entity';
 import { Profile } from '../profiles/entities/profile.entity';
+import { ProfilePrivate } from '../profiles-private/entities/profile-private.entity';
 import { Preference } from '../preferences/entities/preference.entity';
 
 @Module({
@@ -20,6 +21,7 @@ import { Preference } from '../preferences/entities/preference.entity';
       Recommendation,
       User,
       Profile,
+      ProfilePrivate,
       Preference,
     ]),
     HttpModule,

@@ -1,10 +1,10 @@
+import '../services/api_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_card_swiper/flutter_card_swiper.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
-import '../routes/app_router.dart';
 
 final feedProvider = FutureProvider.autoDispose<List<dynamic>>((ref) async {
   // Let it refetch every time for now to ensure we get fresh data.

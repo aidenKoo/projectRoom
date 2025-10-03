@@ -1,5 +1,10 @@
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../providers/draft_provider.dart';
+import '../services/api_service.dart';
 
 class PreferenceItem {
   final String type;
@@ -16,17 +21,16 @@ class PreferenceItem {
   int get hashCode => type.hashCode;
 }
 
-class PreferencesSetupPage extends StatefulWidget {
+class PreferencesSetupPage extends ConsumerStatefulWidget {
   const PreferencesSetupPage({super.key});
 
   @override
-  State<PreferencesSetupPage> createState() => _PreferencesSetupPageState();
+  ConsumerState<PreferencesSetupPage> createState() => _PreferencesSetupPageState();
 }
 
-class _PreferencesSetupPageState extends State<PreferencesSetupPage> {
+class _PreferencesSetupPageState extends ConsumerState<PreferencesSetupPage> {
   bool _isLoading = false;
 
-  // Full list of available preference categories
   final List<PreferenceItem> _availablePreferences = [
     PreferenceItem(type: 'age_range', name: '나이'),
     PreferenceItem(type: 'height_range', name: '키'),
@@ -38,13 +42,31 @@ class _PreferencesSetupPageState extends State<PreferencesSetupPage> {
     PreferenceItem(type: 'personality_keyword', name: '성격 키워드'),
   ];
 
-  // User's selected and ranked preferences
-  final List<PreferenceItem> _selectedPreferences = [];
+  List<PreferenceItem> _selectedPreferences = [];
+
+  @override
+  void initState() {
+    super.initState();
+    final draft = ref.read(draftProvider);
+    final preferenceTypes = draft['preferences'] as List<dynamic>?;
+    if (preferenceTypes != null) {
+      _selectedPreferences = preferenceTypes
+          .map((type) => _availablePreferences.firstWhere((item) => item.type == type, orElse: () => PreferenceItem(type: 'unknown', name: 'Unknown')))
+          .where((item) => item.type != 'unknown')
+          .toList();
+    }
+  }
+
+  void _saveDraft() {
+    final preferenceTypes = _selectedPreferences.map((item) => item.type).toList();
+    ref.read(draftProvider.notifier).updateField('preferences', preferenceTypes);
+  }
 
   void _addPreference(PreferenceItem item) {
     if (_selectedPreferences.length < 5 && !_selectedPreferences.contains(item)) {
       setState(() {
         _selectedPreferences.add(item);
+        _saveDraft();
       });
     }
   }
@@ -52,6 +74,7 @@ class _PreferencesSetupPageState extends State<PreferencesSetupPage> {
   void _removePreference(PreferenceItem item) {
     setState(() {
       _selectedPreferences.remove(item);
+      _saveDraft();
     });
   }
 
@@ -79,8 +102,7 @@ class _PreferencesSetupPageState extends State<PreferencesSetupPage> {
         return {
           'rank': entry.key + 1,
           'type': entry.value.type,
-          // The actual value for the preference would be set elsewhere
-          'value': 'any' 
+          'value': 'any' // The actual value for the preference would be set elsewhere
         };
       }).toList();
 
@@ -90,6 +112,9 @@ class _PreferencesSetupPageState extends State<PreferencesSetupPage> {
         'items': items,
         'weights': weights,
       });
+
+      // This is the final step, so clear the entire draft.
+      await ref.read(draftProvider.notifier).clearDraft();
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -199,6 +224,7 @@ class _PreferencesSetupPageState extends State<PreferencesSetupPage> {
                         if (newIndex > oldIndex) newIndex -= 1;
                         final item = _selectedPreferences.removeAt(oldIndex);
                         _selectedPreferences.insert(newIndex, item);
+                        _saveDraft();
                       });
                     },
                     children: _selectedPreferences.map((item) {

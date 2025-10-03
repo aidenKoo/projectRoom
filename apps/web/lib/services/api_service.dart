@@ -2,119 +2,122 @@ import 'package:dio/dio.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class ApiService {
-  static const String baseUrl = 'http://localhost:3001';
   final Dio _dio;
 
-  ApiService()
-      : _dio = Dio(BaseOptions(
-          baseUrl: baseUrl,
-          connectTimeout: const Duration(seconds: 5),
-          receiveTimeout: const Duration(seconds: 3),
-        )) {
+  ApiService() : _dio = Dio(BaseOptions(baseUrl: 'http://localhost:3001/v1')) {
     _dio.interceptors.add(InterceptorsWrapper(
       onRequest: (options, handler) async {
-        // Attach Firebase ID Token to all requests
-        final user = FirebaseAuth.instance.currentUser;
-        if (user != null) {
-          final token = await user.getIdToken();
+        final token = await FirebaseAuth.instance.currentUser?.getIdToken();
+        if (token != null) {
           options.headers['Authorization'] = 'Bearer $token';
         }
         return handler.next(options);
       },
+      onError: (DioException e, handler) {
+        // You can handle errors globally here
+        return handler.next(e);
+      },
     ));
   }
 
-  // Users
-  Future<Map<String, dynamic>> syncUser(Map<String, dynamic> data) async {
-    final response = await _dio.post('/v1/users/sync', data: data);
-    return response.data;
-  }
-
-  Future<Map<String, dynamic>> getMe() async {
-    final response = await _dio.get('/v1/users/me');
-    return response.data;
-  }
-
-  // Feed
-  Future<List<dynamic>> getFeed({int limit = 20}) async {
-    final response = await _dio.get('/v1/feed', queryParameters: {'limit': limit});
-    return response.data as List<dynamic>;
-  }
-
-  // Swipes
-  Future<Map<String, dynamic>> createSwipe({
-    required int targetId,
-    required String action,
-  }) async {
-    final response = await _dio.post('/v1/swipes', data: {
-      'targetId': targetId,
-      'action': action,
-    return response.data;
-  }
-
-  // Profiles
-  Future<Map<String, dynamic>> upsertProfile(Map<String, dynamic> data) async {
-    final response = await _dio.post('/v1/profiles', data: data);
-    return response.data;
-  }
-
-  // Preferences
-  Future<Map<String, dynamic>> upsertPreferences(Map<String, dynamic> data) async {
-    final response = await _dio.post('/v1/preferences', data: data);
-    return response.data;
-  }
-
-  // Profiles-Private
-  Future<Map<String, dynamic>> upsertPrivateProfile(Map<String, dynamic> data) async {
-    final response = await _dio.post('/v1/profiles/private', data: data);
-    return response.data;
-  }
-
-  // Matches
+  // Get list of mutual matches
   Future<List<dynamic>> getMatches() async {
-    final response = await _dio.get('/v1/matches');
-    return response.data as List<dynamic>;
+    final response = await _dio.get('/match/mutuals');
+    return response.data;
   }
 
+  // Get current user's public profile
+  Future<Map<String, dynamic>> getMyPublicProfile() async {
+    final response = await _dio.get('/profiles/me');
+    return response.data;
+  }
+
+  // Get current user's private profile
+  Future<Map<String, dynamic>> getMyPrivateProfile() async {
+    final response = await _dio.get('/profiles/private/me');
+    return response.data;
+  }
+
+  // Match
   Future<Map<String, dynamic>> getMatch(String matchId) async {
-    final response = await _dio.get('/v1/matches/$matchId');
+    final response = await _dio.get('/matches/$matchId');
     return response.data;
   }
 
   // Messages
-  Future<List<dynamic>> getMessages(String matchId, {int limit = 50}) async {
-    final response = await _dio.get(
-      '/v1/messages/$matchId',
-      queryParameters: {'limit': limit},
-    );
-    return response.data as List<dynamic>;
-  }
-
-  Future<Map<String, dynamic>> sendMessage({
-    required String matchId,
-    required String body,
-    String type = 'text',
-  }) async {
-    final response = await _dio.post('/v1/messages/$matchId', data: {
-      'body': body,
-      'type': type,
-    });
+  Future<List<dynamic>> getMessages(String matchId) async {
+    final response = await _dio.get('/messages/$matchId');
     return response.data;
   }
 
-  // Codes
-  Future<Map<String, dynamic>> validateCode(String code) async {
+  Future<Map<String, dynamic>> sendMessage({required String matchId, required String body}) async {
+    final response = await _dio.post('/messages/$matchId', data: {'body': body});
     return response.data;
   }
-
+  
+  // 3 Questions Widget
   Future<void> postInitialAnswers(String matchId, Map<String, String> answers) async {
-    await _dio.post('/v1/matches/$matchId/initial-answers', data: answers);
+    // This is a hypothetical endpoint, adjust if the backend has a different one.
+    await _dio.post('/matches/$matchId/initial-answers', data: answers);
   }
 
-  // Referrals
-  Future<void> addReferral(String name) async {
-    await _dio.post('/v1/referrals', data: {'name': name});
+  // Generic Profile Upsert
+  Future<void> upsertProfile(Map<String, dynamic> data) async {
+    await _dio.post('/profiles', data: data);
+  }
+
+  // Private Profile Upsert
+  Future<void> upsertPrivateProfile(Map<String, dynamic> data) async {
+    await _dio.post('/profiles/private', data: data);
+  }
+
+  // Preferences Upsert
+  Future<void> upsertPreferences(Map<String, dynamic> data) async {
+    await _dio.put('/preferences', data: data);
+  }
+
+  // Monthly Code Validation (§3.1, §8.3)
+  Future<Map<String, dynamic>> validateMonthlyCode(String code) async {
+    try {
+      final response = await _dio.post('/codes/validate', data: {'code': code});
+      return {
+        'valid': response.data['valid'] ?? true,
+        'month': response.data['month'],
+        'remaining': response.data['remaining'],
+      };
+    } catch (e) {
+      return {
+        'valid': false,
+        'error': e.toString(),
+      };
+    }
+  }
+
+  // Submit Referral (§3.1, §8.3)
+  Future<void> submitReferral(String referrerName) async {
+    await _dio.post('/referrals', data: {'referrer_name': referrerName});
+  }
+
+  // Update Preferences (§8.2)
+  Future<void> updatePreferences(Map<String, dynamic> data) async {
+    await _dio.put('/preferences', data: data);
+  }
+
+  // Get Recommendations (§8.4)
+  Future<List<dynamic>> getRecommendations() async {
+    final response = await _dio.get('/match/recommendations');
+    return response.data;
+  }
+
+  // Like/Pass actions (§8.4)
+  Future<void> likeUser(String targetUid) async {
+    await _dio.post('/match/like', data: {'target_id': targetUid});
+  }
+
+  Future<void> skipUser(String targetUid) async {
+    await _dio.post('/match/skip', data: {'target_id': targetUid});
   }
 }
 
+// Create a global instance
 final apiService = ApiService();

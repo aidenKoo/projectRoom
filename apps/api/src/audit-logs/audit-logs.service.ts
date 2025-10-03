@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
-import { AuditLog } from "./entities/audit-log.entity";
+import { AuditLog, AuditAction } from "./entities/audit-log.entity";
 
 export interface CreateLogPayload {
   accessorId: string;
@@ -18,7 +18,30 @@ export class AuditLogsService {
   ) {}
 
   async createLog(payload: CreateLogPayload): Promise<AuditLog> {
-    const logEntry = this.auditLogRepository.create(payload);
+    const logEntry = this.auditLogRepository.create({
+      ...payload,
+      action: payload.action as AuditAction,
+    });
     return this.auditLogRepository.save(logEntry);
+  }
+
+  async findAll(page: number, limit: number, action?: AuditAction, targetUid?: string): Promise<any> {
+    // TODO: Implement
+    return [];
+  }
+
+  async findByTargetUser(uid: string): Promise<any> {
+    // TODO: Implement
+    return {};
+  }
+
+  async findByActor(uid: string): Promise<any> {
+    // TODO: Implement
+    return {};
+  }
+
+  async getStatsByDateRange(start: Date, end: Date): Promise<any> {
+    // TODO: Implement
+    return {};
   }
 }

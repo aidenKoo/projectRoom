@@ -6,6 +6,8 @@ import {
   Request,
   BadRequestException,
 } from "@nestjs/common";
+import { FileInterceptor } from "@nestjs/platform-express";
+import { StorageService } from "./storage.service";
 
 @Controller("storage")
 export class StorageController {

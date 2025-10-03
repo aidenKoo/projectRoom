@@ -1,29 +1,30 @@
+
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../routes/app_router.dart';
 
-final matchesProvider = FutureProvider<List<dynamic>>((ref) async {
+import '../services/api_service.dart';
+
+final matchesProvider = FutureProvider.autoDispose<List<dynamic>>((ref) async {
+  // Automatically refetch every time the user visits the page.
+  ref.keepAlive();
   return apiService.getMatches();
 });
 
 class MatchesPage extends ConsumerWidget {
   const MatchesPage({super.key});
 
-  void _onBottomNavTapped(int index, WidgetRef ref) {
-    final router = ref.read(routerProvider);
+  void _onBottomNavTapped(int index, BuildContext context) {
     switch (index) {
       case 0:
-        router.go('/feed');
+        context.go('/feed');
         break;
       case 1:
-        router.go('/feed');
+        context.go('/matches');
         break;
       case 2:
-        router.go('/matches');
-        break;
-      case 3:
-        router.go('/me');
+        context.go('/me');
         break;
     }
   }
@@ -59,31 +60,35 @@ class MatchesPage extends ConsumerWidget {
             );
           }
 
-          return ListView.builder(
+          return ListView.separated(
             itemCount: matches.length,
+            separatorBuilder: (context, index) => const Divider(height: 1, indent: 80),
             itemBuilder: (context, index) {
               final match = matches[index];
-              // The API response structure needs to be known.
-              // Assuming it has a `matchedUser` object with `display_name` and `photos`
               final matchedUser = match['matchedUser'] ?? {};
               final lastMessage = match['lastMessage'];
+              final photos = (matchedUser['photos'] as List<dynamic>?) ?? [];
 
               return ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 leading: CircleAvatar(
                   radius: 30,
-                  // Use the first photo of the matched user, or a placeholder
-                  backgroundImage: (matchedUser['photos'] as List?)?.isNotEmpty
-                      ? NetworkImage(matchedUser['photos'][0])
+                  backgroundImage: photos.isNotEmpty
+                      ? CachedNetworkImageProvider(photos[0])
                       : null,
-                  child: (matchedUser['photos'] as List?)?.isEmpty ?? true
-                      ? Text(matchedUser['display_name']?[0] ?? '?')
+                  child: photos.isEmpty
+                      ? Text(matchedUser['name']?[0] ?? '?')
                       : null,
                 ),
-                title: Text(matchedUser['display_name'] ?? 'Unknown User'),
-                subtitle: Text(lastMessage?['body'] ?? '대화를 시작해보세요'),
+                title: Text(matchedUser['name'] ?? 'Unknown User', style: const TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: Text(
+                  lastMessage?['body'] ?? '대화를 시작해보세요',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
                 onTap: () {
-                  final matchId = match['id'].toString();
-                  context.go('/chat/$matchId');
+                  final conversationId = match['conversationId'].toString();
+                  context.go('/chat/$conversationId');
                 },
               );
             },
@@ -93,27 +98,27 @@ class MatchesPage extends ConsumerWidget {
         error: (error, stack) => Center(child: Text('매칭 목록을 불러오는데 실패했습니다: $error')),
       ),
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: 2, // Matches is the third item
-        onTap: (index) => _onBottomNavTapped(index, ref),
+        currentIndex: 1, // Matches is the second item
+        onTap: (index) => _onBottomNavTapped(index, context),
         items: const [
           BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: '홈',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.favorite),
+            icon: Icon(Icons.explore_outlined),
+            activeIcon: Icon(Icons.explore),
             label: '피드',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.chat),
+            icon: Icon(Icons.chat_bubble_outline),
+            activeIcon: Icon(Icons.chat_bubble),
             label: '매칭',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.person),
+            icon: Icon(Icons.person_outline),
+            activeIcon: Icon(Icons.person),
             label: '내 정보',
           ),
         ],
         type: BottomNavigationBarType.fixed,
+        showUnselectedLabels: true,
       ),
     );
   }

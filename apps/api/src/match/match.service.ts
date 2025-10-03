@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, NotFoundException, ForbiddenException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, LessThan } from "typeorm";
 import { Like } from "./entities/like.entity";
@@ -156,13 +156,13 @@ export class MatchService {
     for (const candidate of candidates) {
       const scoreResult = await this.scorerService.calculateScore(
         userId,
-        candidate.firebase_uid,
+        candidate.user.firebase_uid,
         token,
       );
 
       const rec = this.recommendationRepository.create({
         userId,
-        targetUserId: candidate.firebase_uid,
+        targetUserId: candidate.user.firebase_uid,
         score: scoreResult.totalScore,
         scoreBreakdown: scoreResult.breakdown,
         sharedBits: scoreResult.sharedBits,
@@ -197,5 +197,16 @@ export class MatchService {
       shownAt: LessThan(threshold),
       isShown: true,
     });
+  }
+
+  // 매칭 후 초기 질문 답변 저장
+  async saveInitialAnswers(
+    userId: string,
+    matchId: string,
+    answers: Record<string, string>,
+  ): Promise<void> {
+    // TODO: 실제 답변 저장 로직 구현
+    // 예: conversations 또는 match_metadata 테이블에 저장
+    console.log('Saving initial answers:', { userId, matchId, answers });
   }
 }

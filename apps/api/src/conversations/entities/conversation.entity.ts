@@ -42,6 +42,9 @@ export class Conversation {
   })
   isEnded: boolean;
 
+  @Column({ type: "json", nullable: true, name: "initial_answers", comment: "3문 3답 답변 내용" })
+  initialAnswers?: Record<string, any>;
+
   @CreateDateColumn({ name: "created_at" })
   createdAt: Date;
 

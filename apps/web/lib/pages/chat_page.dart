@@ -2,8 +2,12 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+
+// Import the new services
+import '../services/api_service.dart';
 import '../services/chat_service.dart';
 
+// Provider to get match details
 final matchDetailsProvider = FutureProvider.autoDispose.family<Map<String, dynamic>, String>((ref, matchId) {
   return apiService.getMatch(matchId);
 });
@@ -35,15 +39,21 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   }
 
   Future<void> _loadHistoryAndConnect() async {
+    if (!mounted) return;
     setState(() => _isLoadingHistory = true);
     try {
       final history = await apiService.getMessages(widget.matchId);
-      _messages.addAll(history);
+      if (!mounted) return;
+      setState(() {
+        _messages.addAll(history.reversed); // Assuming API returns newest first
+      });
 
       await _chatService.connect(widget.matchId);
       _chatService.messages.listen((message) {
+        if (!mounted) return;
+        // Avoid adding duplicates if REST call already added it
         if (!_messages.any((m) => m['id'] == message['id'])) {
-          setState(() => _messages.insert(0, message));
+          setState(() => _messages.add(message));
           _scrollToBottom();
         }
       });
@@ -58,25 +68,52 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     }
   }
 
-  void _sendMessage() {
+  void _sendMessage() async {
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
-
-    _chatService.sendMessage('message', {'matchId': widget.matchId, 'body': text});
-    apiService.sendMessage(matchId: widget.matchId, body: text).then((sentMessage) {
-      if (!_messages.any((m) => m['id'] == sentMessage['id'])) {
-         setState(() => _messages.insert(0, sentMessage));
-         _scrollToBottom();
-      }
-    }).catchError((e) {
-       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('메시지 전송 실패: $e')));
-    });
     _messageController.clear();
+
+    // Optimistically add the message to the UI
+    final optimisticMessage = {
+      'id': DateTime.now().millisecondsSinceEpoch, // Temporary ID
+      'body': text,
+      'sender_id': _currentUserId,
+      'created_at': DateTime.now().toIso8601String(),
+    };
+    setState(() {
+      _messages.add(optimisticMessage);
+    });
+    _scrollToBottom();
+
+    try {
+      final sentMessage = await apiService.sendMessage(matchId: widget.matchId, body: text);
+      // Replace optimistic message with real one from server
+      setState(() {
+        final index = _messages.indexWhere((m) => m['id'] == optimisticMessage['id']);
+        if (index != -1) {
+          _messages[index] = sentMessage;
+        }
+      });
+      // Also send via socket to notify the other user
+      _chatService.sendMessage('message:send', sentMessage);
+    } catch (e) {
+       if (mounted) {
+         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('메시지 전송 실패')));
+         // Remove optimistic message on failure
+         setState(() {
+           _messages.removeWhere((m) => m['id'] == optimisticMessage['id']);
+         });
+       }
+    }
   }
 
   void _scrollToBottom() {
     if (_scrollController.hasClients) {
-      _scrollController.animateTo(0.0, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
     }
   }
 
@@ -112,7 +149,6 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                 ? const Center(child: CircularProgressIndicator())
                 : ListView.builder(
                     controller: _scrollController,
-                    reverse: true,
                     padding: const EdgeInsets.all(16),
                     itemCount: _messages.length,
                     itemBuilder: (context, index) {

@@ -7,7 +7,7 @@ import { Like } from "../match/entities/like.entity";
 import { Message } from "../conversations/entities/message.entity";
 import { Conversation } from "../conversations/entities/conversation.entity";
 
-interface DailyStats {
+export interface DailyStats {
   date: string;
   newUsers: number;
   newMatches: number;
@@ -15,14 +15,14 @@ interface DailyStats {
   activeConversations: number;
 }
 
-interface MatchingStats {
+export interface MatchingStats {
   totalLikes: number;
   totalMatches: number;
   matchRate: number; // 매칭 성공률
   averageLikesPerUser: number;
 }
 
-interface MessagingStats {
+export interface MessagingStats {
   totalConversations: number;
   activeConversations: number;
   totalMessages: number;

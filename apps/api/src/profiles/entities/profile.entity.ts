@@ -48,6 +48,12 @@ export class Profile {
   @Column({ type: "json", nullable: true })
   visibility_flags: any;
 
+  @Column({ type: "json", nullable: true, comment: "취미 목록" })
+  hobbies?: string[];
+
+  @Column({ type: "json", nullable: true, comment: "MBTI" })
+  mbti?: string[];
+
   @CreateDateColumn()
   created_at: Date;
 

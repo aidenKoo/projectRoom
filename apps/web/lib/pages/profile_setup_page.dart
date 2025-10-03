@@ -1,15 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class ProfileSetupPage extends StatefulWidget {
+import '../providers/draft_provider.dart';
+import '../services/api_service.dart';
+
+class ProfileSetupPage extends ConsumerStatefulWidget {
   const ProfileSetupPage({super.key});
 
   @override
-  State<ProfileSetupPage> createState() => _ProfileSetupPageState();
+  ConsumerState<ProfileSetupPage> createState() => _ProfileSetupPageState();
 }
 
-class _ProfileSetupPageState extends State<ProfileSetupPage> {
+class _ProfileSetupPageState extends ConsumerState<ProfileSetupPage> {
   final _formKey = GlobalKey<FormState>();
   final _displayNameController = TextEditingController();
   final _birthYearController = TextEditingController();
@@ -30,6 +34,34 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    // Load initial data from draft
+    final draft = ref.read(draftProvider);
+    _displayNameController.text = draft['display_name'] ?? '';
+    _birthYearController.text = draft['birth_year']?.toString() ?? '';
+    _heightController.text = draft['height']?.toString() ?? '';
+    _occupationController.text = draft['occupation'] ?? '';
+    _educationController.text = draft['education'] ?? '';
+    _mbtiValue = draft['mbti'];
+    _hobbiesController.text = (draft['hobbies'] as List<dynamic>?)?.join(', ') ?? '';
+    _introController.text = draft['intro_text'] ?? '';
+
+    // Add listeners to auto-save
+    _displayNameController.addListener(() => _updateDraft('display_name', _displayNameController.text));
+    _birthYearController.addListener(() => _updateDraft('birth_year', int.tryParse(_birthYearController.text)));
+    _heightController.addListener(() => _updateDraft('height', int.tryParse(_heightController.text)));
+    _occupationController.addListener(() => _updateDraft('occupation', _occupationController.text));
+    _educationController.addListener(() => _updateDraft('education', _educationController.text));
+    _hobbiesController.addListener(() => _updateDraft('hobbies', _hobbiesController.text.split(',').map((e) => e.trim()).toList()));
+    _introController.addListener(() => _updateDraft('intro_text', _introController.text));
+  }
+
+  void _updateDraft(String key, dynamic value) {
+    ref.read(draftProvider.notifier).updateField(key, value);
+  }
+
+  @override
   void dispose() {
     _displayNameController.dispose();
     _birthYearController.dispose();
@@ -46,18 +78,15 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
       setState(() => _isLoading = true);
 
       try {
-        final profileData = {
-          'display_name': _displayNameController.text,
-          'birth_year': int.tryParse(_birthYearController.text),
-          'height': int.tryParse(_heightController.text),
-          'occupation': _occupationController.text,
-          'education': _educationController.text,
-          'mbti': _mbtiValue,
-          'hobbies': _hobbiesController.text.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList(),
-          'intro_text': _introController.text,
-        };
-
+        // Data is already in the draft provider, so we can just read from there
+        final profileData = ref.read(draftProvider);
+        
         await apiService.upsertProfile(profileData);
+
+        // Clear only the fields for this page from the draft, 
+        // allowing other draft data to persist for the next steps.
+        // Or clear the whole draft if this is the final step.
+        // For now, we assume we move to the next step, so we don't clear.
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -164,6 +193,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                     setState(() {
                       _mbtiValue = newValue;
                     });
+                    _updateDraft('mbti', newValue);
                   },
                   validator: (value) => value == null ? 'MBTI를 선택해주세요.' : null,
                 ),

@@ -1,0 +1,1 @@
+ALTER TABLE profiles ADD COLUMN hobbies JSON NULL COMMENT '취미 목록';

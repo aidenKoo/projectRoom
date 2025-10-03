@@ -1,5 +1,10 @@
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../providers/draft_provider.dart';
+import '../services/api_service.dart';
 
 enum WealthLevel { mid, quite_high, high }
 
@@ -19,31 +24,45 @@ extension WealthLevelExtension on WealthLevel {
   }
 }
 
-class PrivateProfileSetupPage extends StatefulWidget {
+class PrivateProfileSetupPage extends ConsumerStatefulWidget {
   const PrivateProfileSetupPage({super.key});
 
   @override
-  State<PrivateProfileSetupPage> createState() => _PrivateProfileSetupPageState();
+  ConsumerState<PrivateProfileSetupPage> createState() => _PrivateProfileSetupPageState();
 }
 
-class _PrivateProfileSetupPageState extends State<PrivateProfileSetupPage> {
+class _PrivateProfileSetupPageState extends ConsumerState<PrivateProfileSetupPage> {
   WealthLevel? _selectedWealthLevel;
   double _lookConfidence = 3;
   double _bodyConfidence = 3;
 
   bool _isLoading = false;
 
+  @override
+  void initState() {
+    super.initState();
+    final draft = ref.read(draftProvider);
+    
+    // Load from draft
+    if (draft['wealth_level'] != null) {
+      _selectedWealthLevel = WealthLevel.values.firstWhere((e) => e.name == draft['wealth_level']);
+    }
+    _lookConfidence = (draft['look_confidence'] as num?)?.toDouble() ?? 3.0;
+    _bodyConfidence = (draft['body_confidence'] as num?)?.toDouble() ?? 3.0;
+  }
+
   Future<void> _submitProfile() async {
     setState(() => _isLoading = true);
 
     try {
+      final draft = ref.read(draftProvider);
       final privateProfileData = {
-        if (_selectedWealthLevel != null) 'wealth_level': _selectedWealthLevel!.name,
-        'look_confidence': _lookConfidence.round(),
-        'body_confidence': _bodyConfidence.round(),
+        if (draft['wealth_level'] != null) 'wealth_level': draft['wealth_level'],
+        if (draft['look_confidence'] != null) 'look_confidence': (draft['look_confidence'] as num).round(),
+        if (draft['body_confidence'] != null) 'body_confidence': (draft['body_confidence'] as num).round(),
       };
 
-      // Only submit if at least one value is provided.
+      // Only submit if at least one value has been provided.
       if (privateProfileData.isNotEmpty) {
         await apiService.upsertPrivateProfile(privateProfileData);
       }
@@ -52,8 +71,8 @@ class _PrivateProfileSetupPageState extends State<PrivateProfileSetupPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('비공개 프로필이 저장되었습니다.')),
         );
-        // The next step in the flow is the values/personality survey
-        context.go('/values');
+        // The next step in the flow is the preferences setup
+        context.go('/preferences-setup');
       }
     } catch (e) {
       if (mounted) {
@@ -115,7 +134,10 @@ class _PrivateProfileSetupPageState extends State<PrivateProfileSetupPage> {
                         child: Text(level.displayName),
                       );
                     }).toList(),
-                    onChanged: (value) => setState(() => _selectedWealthLevel = value),
+                    onChanged: (value) {
+                      setState(() => _selectedWealthLevel = value);
+                      ref.read(draftProvider.notifier).updateField('wealth_level', value?.name);
+                    },
                   ),
                   const SizedBox(height: 32),
 
@@ -127,7 +149,10 @@ class _PrivateProfileSetupPageState extends State<PrivateProfileSetupPage> {
                     max: 5,
                     divisions: 4,
                     label: _lookConfidence.round().toString(),
-                    onChanged: (value) => setState(() => _lookConfidence = value),
+                    onChanged: (value) {
+                      setState(() => _lookConfidence = value);
+                      ref.read(draftProvider.notifier).updateField('look_confidence', value);
+                    },
                   ),
                   const SizedBox(height: 32),
 
@@ -139,7 +164,10 @@ class _PrivateProfileSetupPageState extends State<PrivateProfileSetupPage> {
                     max: 5,
                     divisions: 4,
                     label: _bodyConfidence.round().toString(),
-                    onChanged: (value) => setState(() => _bodyConfidence = value),
+                    onChanged: (value) {
+                      setState(() => _bodyConfidence = value);
+                      ref.read(draftProvider.notifier).updateField('body_confidence', value);
+                    },
                   ),
                   const SizedBox(height: 40),
 

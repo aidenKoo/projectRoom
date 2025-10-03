@@ -1,58 +1,53 @@
 import 'dart:async';
-import 'dart:convert';
-import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:socket_io_client/socket_io_client.dart' as IO;
 
 class ChatService {
-  WebSocketChannel? _channel;
-  final StreamController<dynamic> _messagesController = StreamController.broadcast();
+  IO.Socket? _socket;
+  final _messageStreamController = StreamController<dynamic>.broadcast();
 
-  Stream<dynamic> get messages => _messagesController.stream;
+  Stream<dynamic> get messages => _messageStreamController.stream;
 
   Future<void> connect(String matchId) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      throw Exception('User not authenticated');
+    if (_socket?.connected == true) {
+      return;
     }
-    final token = await user.getIdToken();
 
-    // The WebSocket URL needs to match your backend configuration.
-    // Passing the token for authentication.
-    final uri = Uri.parse('ws://localhost:3001?token=$token');
+    final token = await FirebaseAuth.instance.currentUser?.getIdToken();
+    if (token == null) {
+      throw Exception('Authentication token not found.');
+    }
 
-    _channel = WebSocketChannel.connect(uri);
+    _socket = IO.io('http://localhost:3001/chat', <String, dynamic>{
+      'transports': ['websocket'],
+      'autoConnect': false,
+      'auth': {'token': token},
+    });
 
-    _channel!.stream.listen(
-      (data) {
-        _messagesController.add(jsonDecode(data));
-      },
-      onError: (error) {
-        print('WebSocket Error: $error');
-        _messagesController.addError(error);
-      },
-      onDone: () {
-        print('WebSocket connection closed');
-      },
-    );
+    _socket!.onConnect((_) {
+      print('Socket connected');
+      // Join the specific conversation room
+      _socket!.emit('conversation:join', {'matchId': matchId});
+    });
 
-    // After connecting, join the specific chat room
-    sendMessage('joinRoom', {'matchId': matchId});
+    _socket!.on('message:new', (data) {
+      _messageStreamController.add(data);
+    });
+
+    _socket!.onDisconnect((_) => print('Socket disconnected'));
+    _socket!.onError((data) => print('Socket error: $data'));
+
+    _socket!.connect();
   }
 
   void sendMessage(String event, dynamic data) {
-    if (_channel == null) {
-      print('WebSocket is not connected.');
-      return;
+    if (_socket?.connected == true) {
+      _socket!.emit(event, data);
     }
-    final message = jsonEncode({
-      'event': event,
-      'data': data,
-    });
-    _channel!.sink.add(message);
   }
 
   void dispose() {
-    _channel?.sink.close();
-    _messagesController.close();
+    _messageStreamController.close();
+    _socket?.dispose();
   }
 }

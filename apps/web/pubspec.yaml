@@ -59,9 +59,11 @@ dependencies:
   image_picker: ^1.1.2
   uuid: ^4.4.0
   web_socket_channel: ^3.0.3
+  socket_io_client: ^2.0.3 # For real-time chat
   shimmer: ^3.0.0
   cached_network_image: ^3.3.1
   google_fonts: ^6.2.1
+  shared_preferences: ^2.2.3 # For local storage
 
 dev_dependencies:
   flutter_test:

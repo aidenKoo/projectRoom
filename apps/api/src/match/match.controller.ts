@@ -1,9 +1,9 @@
-import { Controller, Get, Post, Body, Param, Request } from "@nestjs/common";
-import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
-import { MatchService } from './match.service';
+import { Controller, Get, Post, Body, Param, UseGuards, Query, ParseIntPipe, Req } from "@nestjs/common";
+import { MatchService } from "./match.service";
+import { FirebaseAuthGuard } from '../common/guards/firebase-auth.guard';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from "@nestjs/swagger";
 import { CreateLikeDto } from './dto/create-like.dto';
 import { SkipRecommendationDto } from './dto/skip-recommendation.dto';
-import { FirebaseAuthGuard } from '../common/guards/firebase-auth.guard';
 
 @ApiTags('match')
 @Controller('v1/match')
@@ -15,7 +15,7 @@ export class MatchController {
   @Get('recommendations')
   @ApiOperation({ summary: 'Get user recommendations' })
   async getRecommendations(
-    @Request() req: any,
+    @Req() req: any,
     @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
   ) {
     const userId = req.user.uid;
@@ -25,7 +25,7 @@ export class MatchController {
 
   @Post('like')
   @ApiOperation({ summary: 'Like a user and check for a mutual match' })
-  async createLike(@Request() req: any, @Body() createLikeDto: CreateLikeDto) {
+  async createLike(@Req() req: any, @Body() createLikeDto: CreateLikeDto) {
     const userId = req.user.uid;
     return this.matchService.createLike(userId, createLikeDto.targetUserId);
   }
@@ -33,7 +33,7 @@ export class MatchController {
   @Post('skip')
   @ApiOperation({ summary: 'Skip a recommended user' })
   async skipRecommendation(
-    @Request() req: any,
+    @Req() req: any,
     @Body() skipDto: SkipRecommendationDto,
   ) {
     const userId = req.user.uid;
@@ -43,15 +43,26 @@ export class MatchController {
 
   @Get('mutuals')
   @ApiOperation({ summary: 'Get my mutual matches' })
-  async getMyMatches(@Request() req: any) {
+  async getMyMatches(@Req() req: any) {
     const userId = req.user.uid;
     return this.matchService.getMyMatches(userId);
   }
 
   @Get('likes-received')
   @ApiOperation({ summary: 'Get users who liked me' })
-  async getLikesReceived(@Request() req: any) {
+  async getLikesReceived(@Req() req: any) {
     const userId = req.user.uid;
     return this.matchService.getLikesReceived(userId);
+  }
+
+  @Post(':matchId/initial-answers')
+  @ApiOperation({ summary: 'Save the initial 3-questions-3-answers' })
+  async saveInitialAnswers(
+    @Req() req: any,
+    @Param('matchId') matchId: string,
+    @Body() answers: Record<string, string>,
+  ) {
+    const userId = req.user.uid;
+    return this.matchService.saveInitialAnswers(userId, matchId, answers);
   }
 }

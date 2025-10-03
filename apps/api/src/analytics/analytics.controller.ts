@@ -4,7 +4,7 @@ import {
   Query,
   ParseIntPipe,
 } from "@nestjs/common";
-import { AnalyticsService } from "./analytics.service";
+import { AnalyticsService, DailyStats, MatchingStats, MessagingStats } from "./analytics.service";
 
 @Controller("analytics")
 // @UseGuards(FirebaseAuthGuard, AdminGuard)
@@ -20,7 +20,7 @@ export class AnalyticsController {
   async getDailyStats(
     @Query("startDate") startDate: string,
     @Query("endDate") endDate: string,
-  ) {
+  ): Promise<DailyStats[]> {
     const start = startDate
       ? new Date(startDate)
       : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
@@ -30,12 +30,12 @@ export class AnalyticsController {
   }
 
   @Get("matching")
-  async getMatchingStats() {
+  async getMatchingStats(): Promise<MatchingStats> {
     return this.analyticsService.getMatchingStats();
   }
 
   @Get("messaging")
-  async getMessagingStats() {
+  async getMessagingStats(): Promise<MessagingStats> {
     return this.analyticsService.getMessagingStats();
   }
 
