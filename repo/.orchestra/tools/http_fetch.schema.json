@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "HTTPFetch",
+  "type": "object",
+  "properties": {
+    "url": { "type": "string", "format": "uri" },
+    "method": { "type": "string", "enum": ["GET", "POST", "PUT", "DELETE"] },
+    "headers": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "body": { "type": ["string", "object", "null"] }
+  },
+  "required": ["url", "method"]
+}

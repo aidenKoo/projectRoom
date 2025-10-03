@@ -1,0 +1,11 @@
+name: gemini
+role: "creator"
+temperature: 0.3
+top_p: 0.9
+seed: 42
+prompt:
+  system: "/prompts/system/v1_system_core.md"
+  task: "/prompts/task/v1_task_builder.md"
+io_contract:
+  mode: "files-block"
+  allow_shell: false

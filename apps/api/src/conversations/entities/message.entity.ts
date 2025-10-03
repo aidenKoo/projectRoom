@@ -12,17 +12,17 @@ import { Conversation } from "./conversation.entity";
 @Entity("messages")
 @Index(["conversationId", "createdAt"])
 export class Message {
-  @PrimaryGeneratedColumn("increment", { type: "bigint" })
+  @PrimaryGeneratedColumn("uuid")
   id: string;
 
-  @Column({ name: "conversation_id", type: "bigint" })
+  @Column({ name: "conversation_id", type: "varchar", length: 64 })
   conversationId: string;
 
   @ManyToOne(() => Conversation)
   @JoinColumn({ name: "conversation_id" })
   conversation: Conversation;
 
-  @Column({ name: "sender_uid", type: "varchar", length: 64 })
+  @Column({ name: "sender_uid", type: "varchar", length: 64, comment: "sender user id" })
   senderUid: string;
 
   @Column({ type: "text", comment: "메시지 본문" })

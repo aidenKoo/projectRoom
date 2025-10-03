@@ -1,0 +1,32 @@
+id: T-20251003-0001
+title: "매칭 점수 계산기 v2"
+owner: aiden
+priority: P1
+targets:
+  - web
+  - server
+artifact_paths:
+  - "/src/server/match/score.ts"
+  - "/tests/match/score.test.ts"
+spec_ref: "/specs/S-0001_match_engine.md#score"
+input_contract:
+  schema: "/.orchestra/tools/db_query.schema.json#MatchCandidate"
+output_contract:
+  files:
+    - path: "/src/server/match/score.ts"
+      must_include:
+        - "export function score("
+        - "JSDoc @params"
+        - "no console.log"
+    - path: "/tests/match/score.test.ts"
+success_criteria:
+  - "N=10k 샘플에서 p95 latency ≤ 5ms (local)"
+  - "경계조건 12개 전부 통과"
+  - "eslint --max-warnings=0"
+llm_params:
+  temperature:
+    gemini: 0.3
+    claude: 0.2
+  max_tokens: 4000
+  styleguide: "/docs/styleguide.md"
+review_checklist_ref: "/docs/llm-standards.md#review-checklist"

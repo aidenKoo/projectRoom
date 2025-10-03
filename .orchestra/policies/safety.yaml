@@ -1,0 +1,7 @@
+sensitive_data:
+  - api_keys
+  - secrets
+  - personal_information
+rules:
+  - "LLM은 외부 URL, 키, 토큰을 직접 출력하지 않는다."
+  - "민감한 요청이 탐지되면 적절히 거부하거나 빈출력을 반환한다."

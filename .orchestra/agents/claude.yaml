@@ -1,0 +1,11 @@
+name: claude
+role: "critic"
+temperature: 0.2
+seed: 7
+prompt:
+  system: "/prompts/system/v1_system_core.md"
+  critic: "/prompts/critic/v1_selfcrit.md"
+checklist:
+  - "입출력 계약 준수"
+  - "경계조건 추가"
+  - "보안/성능/가독성 리스크 표기"

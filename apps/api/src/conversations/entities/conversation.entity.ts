@@ -10,17 +10,17 @@ import {
 @Entity("conversations")
 @Index(["matchId"])
 export class Conversation {
-  @PrimaryGeneratedColumn("increment", { type: "bigint" })
+  @PrimaryGeneratedColumn("uuid")
   id: string;
 
-  @Column({ name: "match_id", type: "bigint" })
+  @Column({ name: "match_id", type: "varchar", length: 64 })
   matchId: string;
 
   @Column({
     name: "user_a_id",
     type: "varchar",
     length: 64,
-    comment: "참여자 A (firebase_uid)",
+    comment: "참여자 A (user id)",
   })
   userAId: string;
 
@@ -28,7 +28,7 @@ export class Conversation {
     name: "user_b_id",
     type: "varchar",
     length: 64,
-    comment: "참여자 B (firebase_uid)",
+    comment: "참여자 B (user id)",
   })
   userBId: string;
 

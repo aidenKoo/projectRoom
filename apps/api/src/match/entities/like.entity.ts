@@ -14,7 +14,7 @@ import { User } from "../../users/entities/user.entity";
 @Unique(["fromUserId", "toUserId"])
 @Index(["toUserId", "createdAt"])
 export class Like {
-  @PrimaryGeneratedColumn("increment", { type: "bigint" })
+  @PrimaryGeneratedColumn("uuid")
   id: string;
 
   @Column({ name: "from_uid", type: "varchar", length: 64 })

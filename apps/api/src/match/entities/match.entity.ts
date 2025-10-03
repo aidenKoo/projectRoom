@@ -12,7 +12,7 @@ import { User } from "../../users/entities/user.entity";
 @Entity("matches")
 @Index(["uidA", "uidB"], { unique: true })
 export class Match {
-  @PrimaryGeneratedColumn("increment", { type: "bigint" })
+  @PrimaryGeneratedColumn("uuid")
   id: string;
 
   @Column({ name: "uid_a", type: "varchar", length: 64 })
