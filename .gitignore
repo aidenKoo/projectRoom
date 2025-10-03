@@ -81,3 +81,6 @@ memo
 *.pem
 memo
 *.env
+
+# Large binary files
+*.deb
