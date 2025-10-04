@@ -36,9 +36,9 @@ export class ReferralsController {
     }
 
     const firebaseUid = req.user.uid;
-    const user = await this.usersService.findByFirebaseUid(firebaseUid);
+    const user = await this.usersService.findByUid(firebaseUid);
     return this.referralsService.create(
-      user.id,
+      user.uid,
       createReferralDto.referrerName,
     );
   }
@@ -47,8 +47,8 @@ export class ReferralsController {
   @ApiOperation({ summary: "내 추천인 정보 조회" })
   async findMine(@Request() req) {
     const firebaseUid = req.user.uid;
-    const user = await this.usersService.findByFirebaseUid(firebaseUid);
-    return this.referralsService.findByUserId(user.id);
+    const user = await this.usersService.findByUid(firebaseUid);
+    return this.referralsService.findByUserId(user.uid);
   }
 
   @Get("stats")

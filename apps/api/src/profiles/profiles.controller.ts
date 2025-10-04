@@ -4,6 +4,8 @@ import {
   Body,
   UseGuards,
   Request,
+  Get,
+  Param,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from "@nestjs/swagger";
 import { ProfilesService } from "./profiles.service";
@@ -22,6 +24,13 @@ export class ProfilesController {
     private readonly usersService: UsersService,
   ) {}
 
+  @Get(":uid")
+  @ApiOperation({ summary: "Get a user profile by UID" })
+  async findOne(@Param("uid") uid: string) {
+    const user = await this.usersService.findByUid(uid);
+    return this.profilesService.findByUserId(user.id);
+  }
+
   @Post()
   @ApiOperation({
     summary: "Create or update profile for current user (upsert)",
@@ -31,7 +40,7 @@ export class ProfilesController {
     @Body() profileDto: CreateProfileDto | UpdateProfileDto,
   ) {
     const firebaseUid = req.user.uid;
-    const user = await this.usersService.findByFirebaseUid(firebaseUid);
+    const user = await this.usersService.findByUid(firebaseUid);
     const token = req.headers.authorization?.split(" ")[1];
     return this.profilesService.upsert(user.id, profileDto, token);
   }

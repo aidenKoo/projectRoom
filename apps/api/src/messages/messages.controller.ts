@@ -41,12 +41,12 @@ export class MessagesController {
     @Query("limit") limit?: string,
   ) {
     const firebaseUid = req.user.uid;
-    const user = await this.usersService.findByFirebaseUid(firebaseUid);
+    const user = await this.usersService.findByUid(firebaseUid);
 
     const limitNum = limit ? parseInt(limit, 10) : 50;
     return this.messagesService.findByMatchId(
       parseInt(matchId, 10),
-      user.id,
+      user.uid,
       limitNum,
     );
   }
@@ -59,11 +59,11 @@ export class MessagesController {
     @Body() createMessageDto: CreateMessageDto,
   ) {
     const firebaseUid = req.user.uid;
-    const user = await this.usersService.findByFirebaseUid(firebaseUid);
+    const user = await this.usersService.findByUid(firebaseUid);
 
     return this.messagesService.create(
       parseInt(matchId, 10),
-      user.id,
+      user.uid,
       createMessageDto.body || "",
       createMessageDto.type,
     );

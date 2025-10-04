@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Injectable, NotFoundException, Inject, forwardRef } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { User } from "./entities/user.entity";
@@ -10,27 +10,23 @@ export class UsersService {
   constructor(
     @InjectRepository(User)
     private usersRepository: Repository<User>,
+    @Inject(forwardRef(() => StatisticsService))
     private readonly statisticsService: StatisticsService,
   ) {}
 
   async syncUser(firebaseUid: string, syncUserDto: SyncUserDto): Promise<User> {
     let user = await this.usersRepository.findOne({
-      where: { firebase_uid: firebaseUid },
+      where: { uid: firebaseUid },
     });
 
     if (user) {
       // Update existing user
-      await this.usersRepository.update(
-        { firebase_uid: firebaseUid },
-        syncUserDto,
-      );
-      user = await this.usersRepository.findOne({
-        where: { firebase_uid: firebaseUid },
-      });
+      await this.usersRepository.update({ uid: firebaseUid }, syncUserDto);
+      user = await this.usersRepository.findOne({ where: { uid: firebaseUid } });
     } else {
       // Create new user
       user = this.usersRepository.create({
-        firebase_uid: firebaseUid,
+        uid: firebaseUid,
         ...syncUserDto,
       });
       await this.usersRepository.save(user);
@@ -40,20 +36,10 @@ export class UsersService {
     return user;
   }
 
-  async findByFirebaseUid(firebaseUid: string): Promise<User> {
+  async findByUid(uid: string): Promise<User> {
     const user = await this.usersRepository.findOne({
-      where: { firebase_uid: firebaseUid },
+      where: { uid },
     });
-
-    if (!user) {
-      throw new NotFoundException("User not found");
-    }
-
-    return user;
-  }
-
-  async findById(id: number): Promise<User> {
-    const user = await this.usersRepository.findOne({ where: { id } });
 
     if (!user) {
       throw new NotFoundException("User not found");

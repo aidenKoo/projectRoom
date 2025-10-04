@@ -3,7 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/widgets/multi_select_chip.dart';
 import '../../core/widgets/photo_upload_grid.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/draft_provider.dart';
+import '../../providers/profile_provider.dart';
 
 /// Public profile form based on §3.2 requirements
 /// Required fields: name, age, height, photos (≥1), job, education, MBTI, hobbies, region
@@ -16,6 +18,7 @@ class PublicProfileForm extends ConsumerStatefulWidget {
 
 class _PublicProfileFormState extends ConsumerState<PublicProfileForm> {
   final _formKey = GlobalKey<FormState>();
+  bool _isProfileLoaded = false;
 
   // Controllers
   final _nameController = TextEditingController();
@@ -91,8 +94,36 @@ class _PublicProfileFormState extends ConsumerState<PublicProfileForm> {
       'hobbies': _selectedHobbies,
       'region_code': _regionCode,
       'is_living_alone': _isLivingAlone,
-      'photos': _photos.map((p) => p.fileName).toList(),
+      'photos': _photos
+          .where((p) => p.uploadedUrl != null)
+          .map((p) => p.uploadedUrl!)
+          .toList(),
     });
+  }
+
+  void _populateFormFromProfile(Map<String, dynamic> profile) {
+    _nameController.text = profile['name'] ?? '';
+    _ageController.text = profile['age']?.toString() ?? '';
+    _heightController.text = profile['height_cm']?.toString() ?? '';
+    _jobController.text = profile['job'] ?? '';
+    _bioController.text = profile['bio_highlight'] ?? '';
+    _education = profile['education'];
+    _selectedMbti = List<String>.from(profile['mbti'] ?? []);
+    _selectedHobbies = List<String>.from(profile['hobbies'] ?? []);
+    _regionCode = profile['region_code'];
+    _isLivingAlone = profile['is_living_alone'] ?? false;
+
+    if (profile['photos'] != null) {
+      final photos = (profile['photos'] as List).map((photoData) {
+        return PhotoItem(
+          id: photoData['id'].toString(),
+          thumbnailUrl: photoData['path'],
+        );
+      }).toList();
+      setState(() {
+        _photos = photos;
+      });
+    }
   }
 
   @override
@@ -107,219 +138,256 @@ class _PublicProfileFormState extends ConsumerState<PublicProfileForm> {
 
   @override
   Widget build(BuildContext context) {
-    return Form(
-      key: _formKey,
-      child: ListView(
-        padding: const EdgeInsets.all(24.0),
-        children: [
-          _buildSectionTitle(context, '기본 정보'),
-          const SizedBox(height: 16),
+    final currentUser = ref.watch(currentUserProvider);
 
-          TextFormField(
-            controller: _nameController,
-            decoration: const InputDecoration(
-              labelText: '이름',
-              hintText: '실명 권장 (1~20자)',
-              border: OutlineInputBorder(),
-            ),
-            validator: (value) {
-              if (value == null || value.trim().isEmpty) {
-                return '이름을 입력해주세요';
-              }
-              if (value.length > 20) {
-                return '이름은 20자 이내로 입력해주세요';
-              }
-              return null;
-            },
-            onChanged: (_) => _saveToDraft(),
+    if (currentUser == null) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text('사용자 정보를 불러오는 중...'),
+          ],
+        ),
+      );
+    }
+
+    final userId = currentUser.uid;
+    final profileData = ref.watch(publicProfileProvider(userId));
+
+    return profileData.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (err, stack) => Center(child: Text('Error: $err')),
+      data: (profile) {
+        // Populate form only once
+        if (!_isProfileLoaded) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              _populateFormFromProfile(profile);
+              setState(() {
+                _isProfileLoaded = true;
+              });
+            }
+          });
+        }
+
+        return Form(
+          key: _formKey,
+          child: ListView(
+            padding: const EdgeInsets.all(24.0),
+            children: [
+              _buildSectionTitle(context, '기본 정보'),
+              const SizedBox(height: 16),
+
+              TextFormField(
+                controller: _nameController,
+                decoration: const InputDecoration(
+                  labelText: '이름',
+                  hintText: '실명 권장 (1~20자)',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return '이름을 입력해주세요';
+                  }
+                  if (value.length > 20) {
+                    return '이름은 20자 이내로 입력해주세요';
+                  }
+                  return null;
+                },
+                onChanged: (_) => _saveToDraft(),
+              ),
+              const SizedBox(height: 16),
+
+              TextFormField(
+                controller: _ageController,
+                decoration: const InputDecoration(
+                  labelText: '나이',
+                  hintText: '19~60',
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return '나이를 입력해주세요';
+                  }
+                  final age = int.tryParse(value);
+                  if (age == null || age < 19 || age > 60) {
+                    return '19~60 사이의 나이를 입력해주세요';
+                  }
+                  return null;
+                },
+                onChanged: (_) => _saveToDraft(),
+              ),
+              const SizedBox(height: 16),
+
+              TextFormField(
+                controller: _heightController,
+                decoration: const InputDecoration(
+                  labelText: '키 (cm)',
+                  hintText: '130~220',
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return '키를 입력해주세요';
+                  }
+                  final height = int.tryParse(value);
+                  if (height == null || height < 130 || height < 220) {
+                    return '130~220cm 사이의 키를 입력해주세요';
+                  }
+                  return null;
+                },
+                onChanged: (_) => _saveToDraft(),
+              ),
+              const SizedBox(height: 32),
+
+              _buildSectionTitle(context, '사진'),
+              const SizedBox(height: 16),
+              PhotoUploadGrid(
+                userId: userId,
+                photos: _photos,
+                onPhotosChanged: (photos) {
+                  setState(() => _photos = photos);
+                  _saveToDraft();
+                },
+              ),
+              const SizedBox(height: 32),
+
+              _buildSectionTitle(context, '직업 & 학력'),
+              const SizedBox(height: 16),
+
+              TextFormField(
+                controller: _jobController,
+                decoration: const InputDecoration(
+                  labelText: '직업',
+                  hintText: '예: 소프트웨어 엔지니어',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return '직업을 입력해주세요';
+                  }
+                  if (value.length > 30) {
+                    return '직업은 30자 이내로 입력해주세요';
+                  }
+                  return null;
+                },
+                onChanged: (_) => _saveToDraft(),
+              ),
+              const SizedBox(height: 16),
+
+              DropdownButtonFormField<String>(
+                value: _education,
+                decoration: const InputDecoration(
+                  labelText: '학력',
+                  border: OutlineInputBorder(),
+                ),
+                items: _educationOptions.map((label) {
+                  return DropdownMenuItem(
+                    value: label,
+                    child: Text(label),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  setState(() => _education = value);
+                  _saveToDraft();
+                },
+                validator: (value) => value == null ? '학력을 선택해주세요' : null,
+              ),
+              const SizedBox(height: 32),
+
+              _buildSectionTitle(context, '성격 & 취미'),
+              const SizedBox(height: 8),
+              Text(
+                'MBTI (1~2개 선택, 확신이 없으면 "모름" 선택)',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 12),
+              MultiSelectChip(
+                options: _mbtiOptions,
+                selectedValues: _selectedMbti,
+                maxSelections: 2,
+                onChanged: (values) {
+                  setState(() => _selectedMbti = values);
+                  _saveToDraft();
+                },
+              ),
+              const SizedBox(height: 24),
+
+              Text(
+                '취미 (1~5개 선택)',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 12),
+              MultiSelectChip(
+                options: _hobbiesOptions,
+                selectedValues: _selectedHobbies,
+                maxSelections: 5,
+                onChanged: (values) {
+                  setState(() => _selectedHobbies = values);
+                  _saveToDraft();
+                },
+              ),
+              const SizedBox(height: 32),
+
+              _buildSectionTitle(context, '지역'),
+              const SizedBox(height: 16),
+
+              DropdownButtonFormField<String>(
+                value: _regionCode,
+                decoration: const InputDecoration(
+                  labelText: '거주 지역',
+                  border: OutlineInputBorder(),
+                ),
+                items: _regionOptions.map((code) {
+                  return DropdownMenuItem(
+                    value: code,
+                    child: Text(_getRegionLabel(code)),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  setState(() => _regionCode = value);
+                  _saveToDraft();
+                },
+                validator: (value) => value == null ? '지역을 선택해주세요' : null,
+              ),
+              const SizedBox(height: 16),
+
+              CheckboxListTile(
+                title: const Text('자취 여부'),
+                value: _isLivingAlone,
+                onChanged: (value) {
+                  setState(() => _isLivingAlone = value ?? false);
+                  _saveToDraft();
+                },
+                contentPadding: EdgeInsets.zero,
+              ),
+              const SizedBox(height: 32),
+
+              _buildSectionTitle(context, '자기소개 (선택)'),
+              const SizedBox(height: 16),
+
+              TextFormField(
+                controller: _bioController,
+                decoration: const InputDecoration(
+                  labelText: '기타 장점 어필',
+                  hintText: '나를 표현할 수 있는 한 마디 (최대 300자)',
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 4,
+                maxLength: 300,
+                onChanged: (_) => _saveToDraft(),
+              ),
+              const SizedBox(height: 32),
+            ],
           ),
-          const SizedBox(height: 16),
-
-          TextFormField(
-            controller: _ageController,
-            decoration: const InputDecoration(
-              labelText: '나이',
-              hintText: '19~60',
-              border: OutlineInputBorder(),
-            ),
-            keyboardType: TextInputType.number,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            validator: (value) {
-              if (value == null || value.isEmpty) {
-                return '나이를 입력해주세요';
-              }
-              final age = int.tryParse(value);
-              if (age == null || age < 19 || age > 60) {
-                return '19~60 사이의 나이를 입력해주세요';
-              }
-              return null;
-            },
-            onChanged: (_) => _saveToDraft(),
-          ),
-          const SizedBox(height: 16),
-
-          TextFormField(
-            controller: _heightController,
-            decoration: const InputDecoration(
-              labelText: '키 (cm)',
-              hintText: '130~220',
-              border: OutlineInputBorder(),
-            ),
-            keyboardType: TextInputType.number,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            validator: (value) {
-              if (value == null || value.isEmpty) {
-                return '키를 입력해주세요';
-              }
-              final height = int.tryParse(value);
-              if (height == null || height < 130 || height > 220) {
-                return '130~220cm 사이의 키를 입력해주세요';
-              }
-              return null;
-            },
-            onChanged: (_) => _saveToDraft(),
-          ),
-          const SizedBox(height: 32),
-
-          _buildSectionTitle(context, '사진'),
-          const SizedBox(height: 16),
-          PhotoUploadGrid(
-            photos: _photos,
-            onPhotosChanged: (photos) {
-              setState(() => _photos = photos);
-              _saveToDraft();
-            },
-          ),
-          const SizedBox(height: 32),
-
-          _buildSectionTitle(context, '직업 & 학력'),
-          const SizedBox(height: 16),
-
-          TextFormField(
-            controller: _jobController,
-            decoration: const InputDecoration(
-              labelText: '직업',
-              hintText: '예: 소프트웨어 엔지니어',
-              border: OutlineInputBorder(),
-            ),
-            validator: (value) {
-              if (value == null || value.trim().isEmpty) {
-                return '직업을 입력해주세요';
-              }
-              if (value.length > 30) {
-                return '직업은 30자 이내로 입력해주세요';
-              }
-              return null;
-            },
-            onChanged: (_) => _saveToDraft(),
-          ),
-          const SizedBox(height: 16),
-
-          DropdownButtonFormField<String>(
-            value: _education,
-            decoration: const InputDecoration(
-              labelText: '학력',
-              border: OutlineInputBorder(),
-            ),
-            items: _educationOptions.map((label) {
-              return DropdownMenuItem(
-                value: label,
-                child: Text(label),
-              );
-            }).toList(),
-            onChanged: (value) {
-              setState(() => _education = value);
-              _saveToDraft();
-            },
-            validator: (value) => value == null ? '학력을 선택해주세요' : null,
-          ),
-          const SizedBox(height: 32),
-
-          _buildSectionTitle(context, '성격 & 취미'),
-          const SizedBox(height: 8),
-          Text(
-            'MBTI (1~2개 선택, 확신이 없으면 "모름" 선택)',
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-          const SizedBox(height: 12),
-          MultiSelectChip(
-            options: _mbtiOptions,
-            selectedValues: _selectedMbti,
-            maxSelections: 2,
-            onChanged: (values) {
-              setState(() => _selectedMbti = values);
-              _saveToDraft();
-            },
-          ),
-          const SizedBox(height: 24),
-
-          Text(
-            '취미 (1~5개 선택)',
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-          const SizedBox(height: 12),
-          MultiSelectChip(
-            options: _hobbiesOptions,
-            selectedValues: _selectedHobbies,
-            maxSelections: 5,
-            onChanged: (values) {
-              setState(() => _selectedHobbies = values);
-              _saveToDraft();
-            },
-          ),
-          const SizedBox(height: 32),
-
-          _buildSectionTitle(context, '지역'),
-          const SizedBox(height: 16),
-
-          DropdownButtonFormField<String>(
-            value: _regionCode,
-            decoration: const InputDecoration(
-              labelText: '거주 지역',
-              border: OutlineInputBorder(),
-            ),
-            items: _regionOptions.map((code) {
-              return DropdownMenuItem(
-                value: code,
-                child: Text(_getRegionLabel(code)),
-              );
-            }).toList(),
-            onChanged: (value) {
-              setState(() => _regionCode = value);
-              _saveToDraft();
-            },
-            validator: (value) => value == null ? '지역을 선택해주세요' : null,
-          ),
-          const SizedBox(height: 16),
-
-          CheckboxListTile(
-            title: const Text('자취 여부'),
-            value: _isLivingAlone,
-            onChanged: (value) {
-              setState(() => _isLivingAlone = value ?? false);
-              _saveToDraft();
-            },
-            contentPadding: EdgeInsets.zero,
-          ),
-          const SizedBox(height: 32),
-
-          _buildSectionTitle(context, '자기소개 (선택)'),
-          const SizedBox(height: 16),
-
-          TextFormField(
-            controller: _bioController,
-            decoration: const InputDecoration(
-              labelText: '기타 장점 어필',
-              hintText: '나를 표현할 수 있는 한 마디 (최대 300자)',
-              border: OutlineInputBorder(),
-            ),
-            maxLines: 4,
-            maxLength: 300,
-            onChanged: (_) => _saveToDraft(),
-          ),
-          const SizedBox(height: 32),
-        ],
-      ),
+        );
+      },
     );
   }
 

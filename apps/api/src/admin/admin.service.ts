@@ -1,4 +1,5 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
+import { Cron } from "@nestjs/schedule";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { User } from "../users/entities/user.entity";
@@ -93,20 +94,20 @@ export class AdminService {
   // 사용자 상세 조회 (비공개 포함)
   async getUserDetail(uid: string) {
     const user = await this.userRepository.findOne({
-      where: { firebase_uid: uid },
+      where: { uid },
     });
     if (!user) {
       throw new Error("User not found");
     }
 
     const profile = await this.profileRepository.findOne({
-      where: { user_id: user.id },
+      where: { user_id: user.uid },
     });
     const profilePrivate = await this.profilePrivateRepository.findOne({
-      where: { userId: user.id },
+      where: { userId: user.uid },
     });
     const preference = await this.preferenceRepository.findOne({
-      where: { userId: user.id },
+      where: { userId: user.uid },
     });
 
     return {
@@ -124,8 +125,12 @@ export class AdminService {
     });
   }
 
-  // 월별 코드 수동 생성
-  async generateMonthlyCode() {
+  private readonly logger = new Logger(AdminService.name);
+
+  @Cron("0 0 1 * *", { timeZone: "Asia/Seoul" })
+  async handleMonthlyCodeGeneration() {
+    this.logger.log("Running cron job to generate monthly code...");
+
     const now = new Date();
     const year = now.getFullYear();
     const month = String(now.getMonth() + 1).padStart(2, "0");
@@ -137,6 +142,7 @@ export class AdminService {
     });
 
     if (existing) {
+      this.logger.log("Monthly code for this month already exists. Skipping.");
       return existing;
     }
 
@@ -152,7 +158,15 @@ export class AdminService {
       isActive: true,
     });
 
-    return this.monthlyCodeRepository.save(monthlyCode);
+    const savedCode = await this.monthlyCodeRepository.save(monthlyCode);
+    this.logger.log(`Successfully generated new monthly code: ${savedCode.code}`);
+    return savedCode;
+  }
+
+  // 월별 코드 수동 생성
+  async generateMonthlyCodeManually() {
+    this.logger.log("Manual trigger for monthly code generation.");
+    return this.handleMonthlyCodeGeneration();
   }
 
   // 추천인 통계

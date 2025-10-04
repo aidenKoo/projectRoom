@@ -34,17 +34,17 @@ export class MatchController {
   @ApiOperation({ summary: 'Like a user and check for a mutual match' })
   async createLike(@Req() req: any, @Body() createLikeDto: CreateLikeDto) {
     const firebaseUid = req.user.uid;
-    const user = await this.userRepository.findOne({ where: { firebase_uid: firebaseUid } });
+    const user = await this.userRepository.findOne({ where: { uid: firebaseUid } });
     if (!user) {
       throw new NotFoundException('User not found');
     }
 
-    const targetUser = await this.userRepository.findOne({ where: { id: createLikeDto.targetUserId } });
+    const targetUser = await this.userRepository.findOne({ where: { uid: createLikeDto.targetUserId } });
     if (!targetUser) {
       throw new NotFoundException('Target user not found');
     }
 
-    return this.matchService.createLike(user.id, targetUser.id);
+    return this.matchService.createLike(user.uid, targetUser.uid);
   }
 
   @Post('skip')
@@ -69,11 +69,11 @@ export class MatchController {
   @ApiOperation({ summary: 'Get users who liked me' })
   async getLikesReceived(@Req() req: any) {
     const firebaseUid = req.user.uid;
-    const user = await this.userRepository.findOne({ where: { firebase_uid: firebaseUid } });
+    const user = await this.userRepository.findOne({ where: { uid: firebaseUid } });
     if (!user) {
       throw new NotFoundException('User not found');
     }
-    return this.matchService.getLikesReceived(user.id);
+    return this.matchService.getLikesReceived(user.uid);
   }
 
   @Post(':matchId/initial-answers')

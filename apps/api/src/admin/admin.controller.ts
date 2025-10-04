@@ -44,7 +44,7 @@ export class AdminController {
   // 월별 코드 수동 생성
   @Post("codes/generate")
   async generateCode() {
-    return this.adminService.generateMonthlyCode();
+    return this.adminService.generateMonthlyCodeManually();
   }
 
   // 추천인 통계

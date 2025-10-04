@@ -6,6 +6,7 @@ import { ProfilesController } from "./profiles.controller";
 import { ProfilesService } from "./profiles.service";
 import { Profile } from "./entities/profile.entity";
 import { UsersModule } from "../users/users.module";
+import { PhotosModule } from "../photos/photos.module";
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { UsersModule } from "../users/users.module";
     UsersModule,
     HttpModule,
     ConfigModule,
+    PhotosModule,
   ],
   controllers: [ProfilesController],
   providers: [ProfilesService],

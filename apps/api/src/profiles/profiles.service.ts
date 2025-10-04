@@ -5,6 +5,7 @@ import { HttpService } from "@nestjs/axios";
 import { ConfigService } from "@nestjs/config";
 import { firstValueFrom } from "rxjs";
 import { Profile } from "./entities/profile.entity";
+import { PhotoMeta } from "../photos/entities/photo-meta.entity";
 
 @Injectable()
 export class ProfilesService {
@@ -13,6 +14,8 @@ export class ProfilesService {
   constructor(
     @InjectRepository(Profile)
     private profilesRepository: Repository<Profile>,
+    @InjectRepository(PhotoMeta)
+    private photoMetaRepository: Repository<PhotoMeta>,
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
   ) {}
@@ -63,7 +66,7 @@ export class ProfilesService {
     return result;
   }
 
-  async findByUserId(userId: number): Promise<Profile> {
+  async findByUserId(userId: number): Promise<any> {
     const profile = await this.profilesRepository.findOne({
       where: { user_id: userId },
       relations: ["user"],
@@ -73,7 +76,11 @@ export class ProfilesService {
       throw new NotFoundException("Profile not found");
     }
 
-    return profile;
+    const photos = await this.photoMetaRepository.find({
+      where: { uid: profile.user.uid },
+    });
+
+    return { ...profile, photos };
   }
 
   private triggerProfileAnalysis(token: string) {

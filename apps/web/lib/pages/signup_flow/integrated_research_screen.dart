@@ -1,3 +1,4 @@
+import 'package:projectroom_web/core/widgets/photo_upload_grid.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -54,11 +55,40 @@ class _IntegratedResearchScreenState extends ConsumerState<IntegratedResearchScr
       return;
     }
 
-    // On last tab, submit all data
+    // On last tab, validate and submit all data
+    final draft = ref.read(draftProvider);
+    final photos = (draft['photos'] as List<dynamic>? ?? []).cast<PhotoItem>();
+
+    // 1. Check photo upload status
+    final isUploading = photos.any((p) => p.uploadTask != null && p.uploadedUrl == null && p.error == null);
+    if (isUploading) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('사진이 업로드 중입니다. 잠시만 기다려주세요.')),
+      );
+      return;
+    }
+
+    final hasError = photos.any((p) => p.error != null);
+    if (hasError) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('업로드에 실패한 사진이 있습니다. 수정한 후 다시 시도해주세요.')),
+      );
+      return;
+    }
+    
+    final allUploaded = photos.every((p) => p.uploadedUrl != null);
+    if (photos.isNotEmpty && !allUploaded) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('사진 업로드가 완료되지 않았습니다.')),
+        );
+        return;
+    }
+
     setState(() => _isLoading = true);
 
     try {
-      final draft = ref.read(draftProvider);
+      // 2. Extract photo URLs
+      final photoUrls = photos.map((p) => p.uploadedUrl!).toList();
 
       // Submit public profile
       await apiService.upsertProfile({
@@ -70,7 +100,7 @@ class _IntegratedResearchScreenState extends ConsumerState<IntegratedResearchScr
         'mbti': draft['mbti'],
         'hobbies': draft['hobbies'],
         'intro_text': draft['bio_highlight'],
-        // TODO: Upload photos and add photo URLs
+        'photo_urls': photoUrls, // Add photo URLs to the payload
       });
 
       // Submit private profile if data exists

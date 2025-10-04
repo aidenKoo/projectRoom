@@ -43,8 +43,8 @@ export class ProfilesPrivateController {
   })
   async upsert(@Request() req, @Body() createDto: CreateProfilePrivateDto) {
     const firebaseUid = req.user.uid;
-    const user = await this.usersService.findByFirebaseUid(firebaseUid);
-    return this.profilesPrivateService.upsert(user.id, createDto);
+    const user = await this.usersService.findByUid(firebaseUid);
+    return this.profilesPrivateService.upsert(user.uid, createDto);
   }
 
   @Get("me")
@@ -59,8 +59,8 @@ export class ProfilesPrivateController {
   })
   async findMine(@Request() req) {
     const firebaseUid = req.user.uid;
-    const user = await this.usersService.findByFirebaseUid(firebaseUid);
-    const profile = await this.profilesPrivateService.findByUserId(user.id);
+    const user = await this.usersService.findByUid(firebaseUid);
+    const profile = await this.profilesPrivateService.findByUserId(user.uid);
 
     if (!profile) {
       return { message: "비공개 프로필이 없습니다." };
@@ -73,16 +73,16 @@ export class ProfilesPrivateController {
   @ApiOperation({ summary: "비공개 프로필 수정" })
   async update(@Request() req, @Body() updateDto: UpdateProfilePrivateDto) {
     const firebaseUid = req.user.uid;
-    const user = await this.usersService.findByFirebaseUid(firebaseUid);
-    return this.profilesPrivateService.update(user.id, updateDto);
+    const user = await this.usersService.findByUid(firebaseUid);
+    return this.profilesPrivateService.update(user.uid, updateDto);
   }
 
   @Delete()
   @ApiOperation({ summary: "비공개 프로필 삭제" })
   async remove(@Request() req) {
     const firebaseUid = req.user.uid;
-    const user = await this.usersService.findByFirebaseUid(firebaseUid);
-    await this.profilesPrivateService.remove(user.id);
+    const user = await this.usersService.findByUid(firebaseUid);
+    await this.profilesPrivateService.remove(user.uid);
     return { message: "비공개 프로필이 삭제되었습니다." };
   }
 }

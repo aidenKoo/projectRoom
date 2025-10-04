@@ -27,7 +27,7 @@ export class FeedController {
     @Query("limit") limit?: string,
   ): Promise<any[]> {
     const firebaseUid = req.user.uid;
-    const user = await this.usersService.findByFirebaseUid(firebaseUid);
+    const user = await this.usersService.findByUid(firebaseUid);
 
     const limitNum = limit ? parseInt(limit, 10) : 20;
     return this.feedService.getFeed(user.id, limitNum);

@@ -32,16 +32,16 @@ export class PreferencesController {
     @Body() createPreferenceDto: CreatePreferenceDto,
   ) {
     const firebaseUid = req.user.uid;
-    const user = await this.usersService.findByFirebaseUid(firebaseUid);
-    return this.preferencesService.upsert(user.id, createPreferenceDto);
+    const user = await this.usersService.findByUid(firebaseUid);
+    return this.preferencesService.upsert(user.uid, createPreferenceDto);
   }
 
   @Get()
   @ApiOperation({ summary: "Get my preferences" })
   async findMine(@Request() req) {
     const firebaseUid = req.user.uid;
-    const user = await this.usersService.findByFirebaseUid(firebaseUid);
-    return this.preferencesService.findByUserId(user.id);
+    const user = await this.usersService.findByUid(firebaseUid);
+    return this.preferencesService.findByUserId(user.uid);
   }
 
   @Patch()
@@ -51,16 +51,16 @@ export class PreferencesController {
     @Body() updatePreferenceDto: UpdatePreferenceDto,
   ) {
     const firebaseUid = req.user.uid;
-    const user = await this.usersService.findByFirebaseUid(firebaseUid);
-    return this.preferencesService.update(user.id, updatePreferenceDto);
+    const user = await this.usersService.findByUid(firebaseUid);
+    return this.preferencesService.update(user.uid, updatePreferenceDto);
   }
 
   @Delete()
   @ApiOperation({ summary: "Delete my preferences" })
   async remove(@Request() req) {
     const firebaseUid = req.user.uid;
-    const user = await this.usersService.findByFirebaseUid(firebaseUid);
-    await this.preferencesService.remove(user.id);
+    const user = await this.usersService.findByUid(firebaseUid);
+    await this.preferencesService.remove(user.uid);
     return { message: "Preferences deleted successfully" };
   }
 }

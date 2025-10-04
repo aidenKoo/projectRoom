@@ -156,13 +156,13 @@ export class MatchService {
     for (const candidate of candidates) {
       const scoreResult = await this.scorerService.calculateScore(
         userId,
-        candidate.user.firebase_uid,
+        candidate.user.uid,
         token,
       );
 
       const rec = this.recommendationRepository.create({
         userId,
-        targetUserId: candidate.user.firebase_uid,
+        targetUserId: candidate.user.uid,
         score: scoreResult.totalScore,
         scoreBreakdown: scoreResult.breakdown,
         sharedBits: scoreResult.sharedBits,

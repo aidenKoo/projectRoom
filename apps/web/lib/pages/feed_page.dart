@@ -1,3 +1,5 @@
+import 'package:go_router/go_router.dart';
+
 import '../services/api_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_card_swiper/flutter_card_swiper.dart';
@@ -5,11 +7,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
-
 final feedProvider = FutureProvider.autoDispose<List<dynamic>>((ref) async {
   // Let it refetch every time for now to ensure we get fresh data.
   // In a real app, you'd use a more sophisticated caching strategy.
-  return apiService.getFeed();
+  return apiService.getRecommendations();
 });
 
 class FeedPage extends ConsumerStatefulWidget {
@@ -23,36 +24,50 @@ class _FeedPageState extends ConsumerState<FeedPage> {
   final CardSwiperController _controller = CardSwiperController();
   List<dynamic> _candidates = [];
 
-  Future<void> _swipe(int index, CardSwiperDirection direction) async {
-    if (index >= _candidates.length) return;
+  Future<bool> _swipe(int index, int? previousIndex, CardSwiperDirection direction) async {
+    if (index >= _candidates.length) return false;
 
-    final action = switch (direction) {
-      CardSwiperDirection.left => 'pass',
-      CardSwiperDirection.right => 'like',
-      CardSwiperDirection.top => 'superlike',
-      CardSwiperDirection.bottom => 'pass',
-    };
-
-    final targetId = _candidates[index]['user']['id'];
+    final targetId = _candidates[index]['id'];
 
     try {
-      final result = await apiService.createSwipe(targetId: targetId, action: action);
-      if (mounted && result['matched'] == true) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('🎉 매칭 성공!'), backgroundColor: Colors.green),
-        );
+      switch (direction) {
+        case CardSwiperDirection.left:
+          await apiService.skipUser(targetId);
+          break;
+        case CardSwiperDirection.right:
+          await apiService.likeUser(targetId);
+          // The old code checked for a match, but the new API doesn't return it directly.
+          // We could add a mechanism to check for matches after a like.
+          break;
+        case CardSwiperDirection.top:
+          await apiService.likeUser(targetId); // Assuming superlike is a like
+          break;
+        case CardSwiperDirection.bottom:
+           await apiService.skipUser(targetId);
+          break;
+        case CardSwiperDirection.none:
+          // No action needed
+          break;
       }
     } catch (e) {
       // Error handling is important, but for now, we fail silently.
+      // Re-add the card to the deck if the API call fails
+      return false;
     }
+    return true;
   }
 
   void _onBottomNavTapped(int index) {
-    final router = ref.read(routerProvider);
     switch (index) {
-      case 0: router.go('/feed'); break;
-      case 1: router.go('/matches'); break;
-      case 2: router.go('/me'); break;
+      case 0:
+        GoRouter.of(context).go('/feed');
+        break;
+      case 1:
+        GoRouter.of(context).go('/matches');
+        break;
+      case 2:
+        GoRouter.of(context).go('/me');
+        break;
     }
   }
 
@@ -192,7 +207,7 @@ class _FeedCardState extends State<_FeedCard> {
                   const Spacer(),
                   // User Info
                   Text(
-                    '${user['display_name'] ?? ''}, ${DateTime.now().year - (user['birth_year'] ?? 2000)}',
+                    '${user['display_name'] ?? ''}, ${DateTime.now().year - (user['birth_year'] ?? 2000)} ',
                     style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold, shadows: [Shadow(blurRadius: 2, color: Colors.black54)]),
                   ),
                   const SizedBox(height: 8),

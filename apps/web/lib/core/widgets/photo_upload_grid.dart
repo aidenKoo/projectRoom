@@ -1,27 +1,38 @@
 import 'dart:typed_data';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:uuid/uuid.dart';
 
 /// Photo upload grid widget with support for 1-5 photos
 /// Based on §3.2 requirements: 1-5 photos, 1 required
-class PhotoUploadGrid extends StatelessWidget {
+class PhotoUploadGrid extends StatefulWidget {
   const PhotoUploadGrid({
     super.key,
+    required this.userId,
     required this.photos,
     required this.onPhotosChanged,
     this.maxPhotos = 5,
     this.minPhotos = 1,
   });
 
+  final String userId;
   final List<PhotoItem> photos;
   final ValueChanged<List<PhotoItem>> onPhotosChanged;
   final int maxPhotos;
   final int minPhotos;
 
+  @override
+  State<PhotoUploadGrid> createState() => _PhotoUploadGridState();
+}
+
+class _PhotoUploadGridState extends State<PhotoUploadGrid> {
+  final _storage = FirebaseStorage.instance;
+
   Future<void> _pickImage(BuildContext context) async {
-    if (photos.length >= maxPhotos) {
+    if (widget.photos.length >= widget.maxPhotos) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('최대 $maxPhotos장까지 업로드 가능합니다.')),
+        SnackBar(content: Text('최대 ${widget.maxPhotos}장까지 업로드 가능합니다.')),
       );
       return;
     }
@@ -37,7 +48,6 @@ class PhotoUploadGrid extends StatelessWidget {
     if (pickedFile != null) {
       final bytes = await pickedFile.readAsBytes();
 
-      // Check file size (10MB limit per §3.2)
       if (bytes.lengthInBytes > 10 * 1024 * 1024) {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -47,19 +57,73 @@ class PhotoUploadGrid extends StatelessWidget {
         return;
       }
 
+      final fileId = const Uuid().v4();
+      final fileExtension = pickedFile.name.split('.').last;
+      final fileName = '$fileId.$fileExtension';
+
       final newPhoto = PhotoItem(
+        id: fileId,
         bytes: bytes,
-        fileName: pickedFile.name,
+        fileName: fileName,
       );
 
-      onPhotosChanged([...photos, newPhoto]);
+      // Start upload immediately
+      _uploadImage(newPhoto);
+
+      widget.onPhotosChanged([...widget.photos, newPhoto]);
+    }
+  }
+
+  void _uploadImage(PhotoItem photo) {
+    try {
+      final ref = _storage.ref('user_photos/${widget.userId}/${photo.fileName}');
+      final uploadTask = ref.putData(
+        photo.bytes,
+        SettableMetadata(contentType: 'image/jpeg'),
+      );
+
+      setState(() {
+        photo.uploadTask = uploadTask;
+      });
+
+      uploadTask.then((snapshot) async {
+        final downloadUrl = await snapshot.ref.getDownloadURL();
+        setState(() {
+          photo.uploadedUrl = downloadUrl;
+        });
+        _updateParentWidget();
+      }).catchError((error) {
+        setState(() {
+          photo.error = error.toString();
+        });
+        _updateParentWidget();
+      });
+    } catch (e) {
+      setState(() {
+        photo.error = e.toString();
+      });
+      _updateParentWidget();
     }
   }
 
   void _removePhoto(int index) {
-    final newPhotos = List<PhotoItem>.from(photos);
+    final photo = widget.photos[index];
+    photo.uploadTask?.cancel();
+
+    final newPhotos = List<PhotoItem>.from(widget.photos);
     newPhotos.removeAt(index);
-    onPhotosChanged(newPhotos);
+    widget.onPhotosChanged(newPhotos);
+  }
+
+  void _retryUpload(PhotoItem photo) {
+    setState(() {
+      photo.error = null;
+    });
+    _uploadImage(photo);
+  }
+
+  void _updateParentWidget() {
+    widget.onPhotosChanged([...widget.photos]);
   }
 
   @override
@@ -70,7 +134,7 @@ class PhotoUploadGrid extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          '사진 ($minPhotos~$maxPhotos장)',
+          '사진 (${widget.minPhotos}~${widget.maxPhotos}장)',
           style: theme.textTheme.bodyLarge?.copyWith(
             fontWeight: FontWeight.w600,
           ),
@@ -92,13 +156,15 @@ class PhotoUploadGrid extends StatelessWidget {
             mainAxisSpacing: 12,
             childAspectRatio: 1,
           ),
-          itemCount: photos.length + (photos.length < maxPhotos ? 1 : 0),
+          itemCount: widget.photos.length + (widget.photos.length < widget.maxPhotos ? 1 : 0),
           itemBuilder: (context, index) {
-            if (index < photos.length) {
+            if (index < widget.photos.length) {
+              final photo = widget.photos[index];
               return _PhotoCard(
-                photo: photos[index],
+                photo: photo,
                 isPrimary: index == 0,
                 onRemove: () => _removePhoto(index),
+                onRetry: () => _retryUpload(photo),
               );
             } else {
               return _AddPhotoCard(
@@ -113,14 +179,22 @@ class PhotoUploadGrid extends StatelessWidget {
 }
 
 class PhotoItem {
-  final Uint8List bytes;
-  final String fileName;
-  final String? uploadedUrl;
+  final String id;
+  final Uint8List? bytes;
+  final String? fileName;
+  String? uploadedUrl;
+  String? thumbnailUrl;
+  UploadTask? uploadTask;
+  String? error;
 
   PhotoItem({
-    required this.bytes,
-    required this.fileName,
+    required this.id,
+    this.bytes,
+    this.fileName,
     this.uploadedUrl,
+    this.thumbnailUrl,
+    this.uploadTask,
+    this.error,
   });
 }
 
@@ -129,11 +203,13 @@ class _PhotoCard extends StatelessWidget {
     required this.photo,
     required this.isPrimary,
     required this.onRemove,
+    required this.onRetry,
   });
 
   final PhotoItem photo;
   final bool isPrimary;
   final VoidCallback onRemove;
+  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -144,10 +220,17 @@ class _PhotoCard extends StatelessWidget {
         Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
-            image: DecorationImage(
-              image: MemoryImage(photo.bytes),
-              fit: BoxFit.cover,
-            ),
+            image: photo.bytes != null
+                ? DecorationImage(
+                    image: MemoryImage(photo.bytes!),
+                    fit: BoxFit.cover,
+                  )
+                : (photo.thumbnailUrl != null
+                    ? DecorationImage(
+                        image: NetworkImage(photo.thumbnailUrl!),
+                        fit: BoxFit.cover,
+                      )
+                    : null),
             border: isPrimary
                 ? Border.all(
                     color: theme.colorScheme.primary,
@@ -156,6 +239,63 @@ class _PhotoCard extends StatelessWidget {
                 : null,
           ),
         ),
+        if (photo.uploadTask != null && photo.uploadedUrl == null && photo.error == null)
+          StreamBuilder<TaskSnapshot>(
+            stream: photo.uploadTask!.snapshotEvents,
+            builder: (context, snapshot) {
+              final progress = snapshot.hasData
+                  ? snapshot.data!.bytesTransferred / snapshot.data!.totalBytes
+                  : 0.0;
+
+              return Container(
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.5),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(
+                      value: progress,
+                      backgroundColor: Colors.grey,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        theme.colorScheme.primary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '${(progress * 100).toStringAsFixed(0)}%',
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        if (photo.error != null)
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.7),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error_outline, color: Colors.red, size: 32),
+                const SizedBox(height: 4),
+                const Text(
+                  '업로드 실패',
+                  style: TextStyle(color: Colors.white, fontSize: 12),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                IconButton(
+                  icon: const Icon(Icons.refresh, color: Colors.white),
+                  onPressed: onRetry,
+                ),
+              ],
+            ),
+          ),
         if (isPrimary)
           Positioned(
             bottom: 4,

@@ -26,6 +26,12 @@ class ApiService {
     return response.data;
   }
 
+  // Get public profile by UID
+  Future<Map<String, dynamic>> getPublicProfile(String uid) async {
+    final response = await _dio.get('/profiles/$uid');
+    return response.data;
+  }
+
   // Get current user's public profile
   Future<Map<String, dynamic>> getMyPublicProfile() async {
     final response = await _dio.get('/profiles/me');

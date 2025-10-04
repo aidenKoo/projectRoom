@@ -54,6 +54,15 @@ export class Profile {
   @Column({ type: "json", nullable: true, comment: "MBTI" })
   mbti?: string[];
 
+  @Column({ type: 'decimal', precision: 10, scale: 8, nullable: true, comment: '위도' })
+  latitude: number;
+
+  @Column({ type: 'decimal', precision: 11, scale: 8, nullable: true, comment: '경도' })
+  longitude: number;
+
+  @Column({ type: 'float', nullable: true, default: 0, comment: '평균 사진 품질 점수' })
+  avg_photo_quality: number;
+
   @CreateDateColumn()
   created_at: Date;
 

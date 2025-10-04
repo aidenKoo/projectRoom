@@ -23,19 +23,17 @@ export class MatchesController {
 
   @Get()
   @ApiOperation({ summary: "Get all matches for current user" })
-  async findAll(@Request() req) {
-    const firebaseUid = req.user.uid;
-    const user = await this.usersService.findByFirebaseUid(firebaseUid);
-    return this.matchesService.findByUserId(user.id);
+  .findByUid(firebaseUid);
+user.uid
   }
 
   @Get(":id")
   @ApiOperation({ summary: "Get match details by ID" })
   async findOne(@Request() req, @Param("id") id: string) {
     const firebaseUid = req.user.uid;
-    const user = await this.usersService.findByFirebaseUid(firebaseUid);
+    const user = await this.usersService.findByUid(firebaseUid);
 
-    const match = await this.matchesService.findById(parseInt(id, 10), user.id);
+    const match = await this.matchesService.findById(parseInt(id, 10), user.uid);
     if (!match) {
       throw new NotFoundException("Match not found");
     }

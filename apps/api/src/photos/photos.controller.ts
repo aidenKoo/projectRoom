@@ -38,8 +38,8 @@ export class PhotosController {
   })
   async create(@Request() req, @Body() createPhotoDto: CreatePhotoDto) {
     const firebaseUid = req.user.uid;
-    const user = await this.usersService.findByFirebaseUid(firebaseUid);
-    return this.photosService.create(user.id, createPhotoDto);
+    const user = await this.usersService.findByUid(firebaseUid);
+    return this.photosService.create(user.uid, createPhotoDto);
   }
 
   @Get()
@@ -61,8 +61,8 @@ export class PhotosController {
   ) {
     if (me === "1") {
       const firebaseUid = req.user.uid;
-      const user = await this.usersService.findByFirebaseUid(firebaseUid);
-      return this.photosService.findByUserId(user.id);
+      const user = await this.usersService.findByUid(firebaseUid);
+      return this.photosService.findByUserId(user.uid);
     }
 
     if (userId) {
@@ -71,8 +71,8 @@ export class PhotosController {
 
     // Default: return own photos
     const firebaseUid = req.user.uid;
-    const user = await this.usersService.findByFirebaseUid(firebaseUid);
-    return this.photosService.findByUserId(user.id);
+    const user = await this.usersService.findByUid(firebaseUid);
+    return this.photosService.findByUserId(user.uid);
   }
 
   @Patch(":id")
@@ -83,16 +83,16 @@ export class PhotosController {
     @Body() updatePhotoDto: UpdatePhotoDto,
   ) {
     const firebaseUid = req.user.uid;
-    const user = await this.usersService.findByFirebaseUid(firebaseUid);
-    return this.photosService.update(parseInt(id, 10), user.id, updatePhotoDto);
+    const user = await this.usersService.findByUid(firebaseUid);
+    return this.photosService.update(parseInt(id, 10), user.uid, updatePhotoDto);
   }
 
   @Delete(":id")
   @ApiOperation({ summary: "Delete a photo" })
   async remove(@Request() req, @Param("id") id: string) {
     const firebaseUid = req.user.uid;
-    const user = await this.usersService.findByFirebaseUid(firebaseUid);
-    await this.photosService.remove(parseInt(id, 10), user.id);
+    const user = await this.usersService.findByUid(firebaseUid);
+    await this.photosService.remove(parseInt(id, 10), user.uid);
     return { message: "Photo deleted successfully" };
   }
 }
