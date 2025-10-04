@@ -12,6 +12,7 @@ import { Like } from "../match/entities/like.entity";
 import { Match } from "../match/entities/match.entity";
 import { Recommendation } from "../match/entities/recommendation.entity";
 import { Message } from "../conversations/entities/message.entity";
+import { PhotoMeta } from "../photos/entities/photo-meta.entity";
 import * as crypto from "crypto";
 
 @Injectable()
@@ -37,7 +38,16 @@ export class AdminService {
     private readonly recommendationRepository: Repository<Recommendation>,
     @InjectRepository(Message)
     private readonly messageRepository: Repository<Message>,
+    @InjectRepository(PhotoMeta)
+    private readonly photoMetaRepository: Repository<PhotoMeta>,
+    @InjectRepository(ABExperiment)
+    private readonly abExperimentRepository: Repository<ABExperiment>,
   ) {}
+
+  // A/B 테스트 목록 조회
+  async getABTests() {
+    return this.abExperimentRepository.find();
+  }
 
   // KPI 메트릭
   async getMetrics() {
@@ -188,5 +198,23 @@ export class AdminService {
       order: { score: "DESC" },
       take: 20,
     });
+  }
+
+  // 사진 목록 조회 (페이지네이션)
+  async getPhotos(page = 1, limit = 20) {
+    const skip = (page - 1) * limit;
+    const [photos, total] = await this.photoMetaRepository.findAndCount({
+      skip,
+      take: limit,
+      order: { createdAt: "DESC" },
+    });
+
+    return {
+      photos,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 }

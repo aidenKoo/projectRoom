@@ -58,4 +58,19 @@ export class AdminController {
   async getMatchQueue(@Query("userId") userId: string) {
     return this.adminService.getMatchQueue(userId);
   }
+
+  // 사진 목록 (페이지네이션)
+  @Get("photos")
+  async getPhotos(
+    @Query("page", new ParseIntPipe({ optional: true })) page = 1,
+    @Query("limit", new ParseIntPipe({ optional: true })) limit = 20,
+  ) {
+    return this.adminService.getPhotos(page, limit);
+  }
+
+  // A/B 테스트 목록
+  @Get("ab-tests")
+  async getABTests() {
+    return this.adminService.getABTests();
+  }
 }

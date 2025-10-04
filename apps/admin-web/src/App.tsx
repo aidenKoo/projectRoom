@@ -1,11 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
 import { Layout, Menu, Spin, Button, theme as antdTheme } from 'antd';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { auth } from './firebase';
 
-import { DashboardOutlined, UserOutlined, QrcodeOutlined, UnorderedListOutlined, HistoryOutlined } from '@ant-design/icons';
+import { DashboardOutlined, UserOutlined, QrcodeOutlined, UnorderedListOutlined, HistoryOutlined, NodeIndexOutlined, FileImageOutlined, ExperimentOutlined } from '@ant-design/icons';
 
 import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
@@ -13,6 +12,9 @@ import UserManagement from './pages/UserManagement';
 import CodeManagement from './pages/CodeManagement';
 import OptionManagement from './pages/OptionManagement';
 import AuditLog from './pages/AuditLog';
+import MatchingStatus from './pages/MatchingStatus';
+import ContentManagement from './pages/ContentManagement';
+import ABTestConsole from './pages/ABTestConsole';
 
 const { Header, Content, Sider } = Layout;
 
@@ -64,11 +66,20 @@ const App: React.FC = () => {
                   <Menu.Item key="/users" icon={<UserOutlined />}>
                     <Link to="/users">Users</Link>
                   </Menu.Item>
+                  <Menu.Item key="/matching-status" icon={<NodeIndexOutlined />}>
+                    <Link to="/matching-status">Matching Status</Link>
+                  </Menu.Item>
+                  <Menu.Item key="/content" icon={<FileImageOutlined />}>
+                    <Link to="/content">Content</Link>
+                  </Menu.Item>
                   <Menu.Item key="/codes" icon={<QrcodeOutlined />}>
                     <Link to="/codes">Codes</Link>
                   </Menu.Item>
                   <Menu.Item key="/options" icon={<UnorderedListOutlined />}>
                     <Link to="/options">Options</Link>
+                  </Menu.Item>
+                  <Menu.Item key="/ab-tests" icon={<ExperimentOutlined />}>
+                    <Link to="/ab-tests">A/B Tests</Link>
                   </Menu.Item>
                   <Menu.Item key="/logs" icon={<HistoryOutlined />}>
                     <Link to="/logs">Audit Logs</Link>
@@ -84,6 +95,9 @@ const App: React.FC = () => {
                     <Routes>
                         <Route path="/" element={<Dashboard />} />
                         <Route path="/users" element={<UserManagement />} />
+                        <Route path="/matching-status" element={<MatchingStatus />} />
+                        <Route path="/content" element={<ContentManagement />} />
+                        <Route path="/ab-tests" element={<ABTestConsole />} />
                         <Route path="/codes" element={<CodeManagement />} />
                         <Route path="/options" element={<OptionManagement />} />
                         <Route path="/logs" element={<AuditLog />} />
