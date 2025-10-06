@@ -15,7 +15,7 @@ export class Recommendation {
   @Column({
     name: "user_id",
     type: "varchar",
-    length: 64,
+    length: 128,
     comment: "추천받는 사용자",
   })
   userId: string;
@@ -23,7 +23,7 @@ export class Recommendation {
   @Column({
     name: "target_user_id",
     type: "varchar",
-    length: 64,
+    length: 128,
     comment: "추천된 사용자",
   })
   targetUserId: string;

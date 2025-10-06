@@ -52,13 +52,16 @@ export class MatchScorerService {
 
     const likedUserIds = (
       await this.likeRepository.find({
-        where: { fromUserId: myUser.id },
+        where: { fromUserId: myUser.firebase_uid },
         select: ['toUserId'],
       })
     ).map((l) => l.toUserId);
 
     const matchedUsersQuery = await this.matchRepository.find({
-      where: [{ uidA: myUser.id }, { uidB: myUser.id }],
+      where: [
+        { uidA: myUser.firebase_uid },
+        { uidB: myUser.firebase_uid },
+      ],
     });
     const matchedUserIds = matchedUsersQuery.flatMap((m) => [m.uidA, m.uidB]);
 

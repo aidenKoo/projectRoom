@@ -39,12 +39,12 @@ export class MatchController {
       throw new NotFoundException('User not found');
     }
 
-    const targetUser = await this.userRepository.findOne({ where: { id: createLikeDto.targetUserId } });
+    const targetUser = await this.userRepository.findOne({ where: { firebase_uid: createLikeDto.targetUserId } });
     if (!targetUser) {
       throw new NotFoundException('Target user not found');
     }
 
-    return this.matchService.createLike(user.id, targetUser.id);
+    return this.matchService.createLike(user.firebase_uid, targetUser.firebase_uid);
   }
 
   @Post('skip')
@@ -73,7 +73,7 @@ export class MatchController {
     if (!user) {
       throw new NotFoundException('User not found');
     }
-    return this.matchService.getLikesReceived(user.id);
+    return this.matchService.getLikesReceived(user.firebase_uid);
   }
 
   @Post(':matchId/initial-answers')
