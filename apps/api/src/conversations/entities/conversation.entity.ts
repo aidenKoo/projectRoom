@@ -19,7 +19,7 @@ export class Conversation {
   @Column({
     name: "user_a_id",
     type: "varchar",
-    length: 64,
+    length: 128,
     comment: "참여자 A (user id)",
   })
   userAId: string;
@@ -27,7 +27,7 @@ export class Conversation {
   @Column({
     name: "user_b_id",
     type: "varchar",
-    length: 64,
+    length: 128,
     comment: "참여자 B (user id)",
   })
   userBId: string;

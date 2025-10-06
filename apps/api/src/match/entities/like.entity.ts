@@ -17,18 +17,18 @@ export class Like {
   @PrimaryGeneratedColumn("uuid")
   id: string;
 
-  @Column({ name: "from_uid", type: "varchar", length: 64 })
+  @Column({ name: "from_uid", type: "varchar", length: 128 })
   fromUserId: string;
 
-  @Column({ name: "to_uid", type: "varchar", length: 64 })
+  @Column({ name: "to_uid", type: "varchar", length: 128 })
   toUserId: string;
 
   @ManyToOne(() => User)
-  @JoinColumn({ name: "from_uid" })
+  @JoinColumn({ name: "from_uid", referencedColumnName: "firebase_uid" })
   fromUser: User;
 
   @ManyToOne(() => User)
-  @JoinColumn({ name: "to_uid" })
+  @JoinColumn({ name: "to_uid", referencedColumnName: "firebase_uid" })
   toUser: User;
 
   @CreateDateColumn({ name: "created_at" })
