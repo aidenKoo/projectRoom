@@ -14,6 +14,10 @@ const UserManagement: React.FC = () => {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [modalLoading, setModalLoading] = useState(false);
+  const [reasonModalVisible, setReasonModalVisible] = useState(false);
+  const [auditReason, setAuditReason] = useState('');
+  const [auditReasonError, setAuditReasonError] = useState('');
+  const [pendingUserId, setPendingUserId] = useState<string | null>(null);
 
   const fetchUsers = async (page = 1, pageSize = 10, search = '') => {
     try {
@@ -21,11 +25,17 @@ const UserManagement: React.FC = () => {
       const response = await api.get('/admin/users', {
         params: { page, limit: pageSize, search },
       });
-      setUsers(response.data.items);
+      const usersPayload = response.data?.items ?? response.data?.users ?? [];
+      const meta = response.data?.meta ?? {
+        currentPage: page,
+        itemsPerPage: pageSize,
+        totalItems: response.data?.total ?? usersPayload.length,
+      };
+      setUsers(usersPayload);
       setPagination({
-        current: response.data.meta.currentPage,
-        pageSize: response.data.meta.itemsPerPage,
-        total: response.data.meta.totalItems,
+        current: meta.currentPage,
+        pageSize: meta.itemsPerPage,
+        total: meta.totalItems,
       });
     } catch (err) {
       setError('Failed to fetch users.');
@@ -65,17 +75,44 @@ const UserManagement: React.FC = () => {
     setSearchInput(e.target.value);
   };
 
-  const showUserDetails = async (userId: string) => {
+  const requestUserDetails = async (userId: string, reason: string) => {
     try {
       setModalLoading(true);
-      setIsModalVisible(true);
-      const response = await api.get(`/admin/users/${userId}`);
+      const response = await api.get(`/admin/users/${userId}`, {
+        headers: {
+          'X-Audit-Reason': reason,
+        },
+      });
       setSelectedUser(response.data);
+      setIsModalVisible(true);
+      setReasonModalVisible(false);
+      setPendingUserId(null);
     } catch (error) {
       setError('Failed to fetch user details.');
     } finally {
       setModalLoading(false);
     }
+  };
+
+  const handleConfirmAuditReason = async () => {
+    const trimmed = auditReason.trim();
+    if (!trimmed) {
+      setAuditReasonError('Please provide the reason for accessing private data.');
+      return;
+    }
+    if (!pendingUserId) {
+      setReasonModalVisible(false);
+      return;
+    }
+    setAuditReasonError('');
+    await requestUserDetails(pendingUserId, trimmed);
+  };
+
+  const showUserDetails = (userId: string) => {
+    setPendingUserId(userId);
+    setAuditReason('');
+    setAuditReasonError('');
+    setReasonModalVisible(true);
   };
 
   const columns = [
@@ -114,9 +151,22 @@ const UserManagement: React.FC = () => {
         title="User Details"
         visible={isModalVisible}
         onOk={() => setIsModalVisible(false)}
-        onCancel={() => setIsModalVisible(false)}
+        onCancel={() => {
+          setIsModalVisible(false);
+          setSelectedUser(null);
+        }}
         width={800}
-        footer={[<Button key="back" onClick={() => setIsModalVisible(false)}>Close</Button>]}
+        footer={[
+          <Button
+            key="back"
+            onClick={() => {
+              setIsModalVisible(false);
+              setSelectedUser(null);
+            }}
+          >
+            Close
+          </Button>,
+        ]}
       >
         {modalLoading ? <Spin /> : (
           selectedUser && <div>
@@ -140,6 +190,41 @@ const UserManagement: React.FC = () => {
                 <Descriptions.Item label="Body Confidence">{selectedUser.privateProfile?.body_confidence} / 5</Descriptions.Item>
             </Descriptions>
           </div>
+        )}
+      </Modal>
+      <Modal
+        title="Access Reason Required"
+        visible={reasonModalVisible}
+        onOk={handleConfirmAuditReason}
+        onCancel={() => {
+          if (!modalLoading) {
+            setReasonModalVisible(false);
+            setPendingUserId(null);
+            setAuditReason('');
+            setAuditReasonError('');
+          }
+        }}
+        okText="Confirm"
+        cancelButtonProps={{ disabled: modalLoading }}
+        okButtonProps={{ disabled: modalLoading }}
+      >
+        <p>Please enter why you are accessing this user’s private profile.</p>
+        <Input.TextArea
+          rows={3}
+          maxLength={255}
+          value={auditReason}
+          onChange={(event) => {
+            setAuditReason(event.target.value);
+            if (auditReasonError) {
+              setAuditReasonError('');
+            }
+          }}
+          placeholder="e.g., Investigating a user report for inappropriate content"
+        />
+        {auditReasonError && (
+          <Typography.Text type="danger" style={{ display: 'block', marginTop: 8 }}>
+            {auditReasonError}
+          </Typography.Text>
         )}
       </Modal>
     </div>

@@ -14,7 +14,7 @@ vi.mock('firebase/auth', async () => {
   const actual = await vi.importActual<typeof import('firebase/auth')>('firebase/auth');
   return {
     ...actual,
-    onAuthStateChanged: (_auth, callback: (user: any) => void) => {
+    onAuthStateChanged: (_auth: unknown, callback: (user: any) => void) => {
       callback(null);
       return () => {};
     },
