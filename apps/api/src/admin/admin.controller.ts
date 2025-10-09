@@ -55,10 +55,18 @@ export class AdminController {
       );
     }
 
+    const forwardedFor = req.headers["x-forwarded-for"] as string | undefined;
+    const ip = forwardedFor
+      ? forwardedFor.split(",")[0]?.trim()
+      : req.ip;
+    const requestId = (req.headers["x-request-id"] as string | undefined)?.trim();
+
     return this.adminService.getUserDetail(uid, {
       accessorId,
       reason,
       action: AuditAction.READ_PRIVATE_PROFILE,
+      ip,
+      requestId,
     });
   }
 

@@ -10,6 +10,8 @@ export interface CreateLogPayload {
   reason?: string;
   targetResource?: string;
   details?: Record<string, any>;
+  ip?: string | null;
+  requestId?: string | null;
 }
 
 @Injectable()
@@ -20,16 +22,34 @@ export class AuditLogsService {
   ) {}
 
   async createLog(payload: CreateLogPayload): Promise<AuditLog> {
-    const mergedDetails: Record<string, any> | undefined =
-      payload.reason || payload.targetResource || payload.details
-        ? {
-            ...(payload.details ?? {}),
-            ...(payload.reason ? { reason: payload.reason } : {}),
-            ...(payload.targetResource
-              ? { targetResource: payload.targetResource }
-              : {}),
-          }
+    const trimmedReason =
+      typeof payload.reason === "string"
+        ? payload.reason.trim().slice(0, 255)
         : undefined;
+    const trimmedResource =
+      typeof payload.targetResource === "string"
+        ? payload.targetResource.trim().slice(0, 255)
+        : undefined;
+
+    const mergedDetailsRaw: Record<string, any> = {
+      ...(payload.details ?? {}),
+    };
+
+    if (trimmedReason) {
+      mergedDetailsRaw.reason = trimmedReason;
+    }
+    if (trimmedResource) {
+      mergedDetailsRaw.targetResource = trimmedResource;
+    }
+    if (payload.ip) {
+      mergedDetailsRaw.ip = payload.ip;
+    }
+    if (payload.requestId) {
+      mergedDetailsRaw.requestId = payload.requestId;
+    }
+
+    const mergedDetails =
+      Object.keys(mergedDetailsRaw).length > 0 ? mergedDetailsRaw : undefined;
 
     const logEntry = this.auditLogRepository.create({
       action: payload.action as AuditAction,

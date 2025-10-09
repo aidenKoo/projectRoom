@@ -19,6 +19,8 @@ interface AuditContext {
   accessorId: string;
   reason: string;
   action: AuditAction;
+  ip?: string | null;
+  requestId?: string | null;
 }
 
 @Injectable()
@@ -138,6 +140,8 @@ export class AdminService {
         action: auditContext.action,
         reason: auditContext.reason,
         targetResource: "admin.users.detail",
+        ip: auditContext.ip,
+        requestId: auditContext.requestId,
         details: {
           profileExists: Boolean(profile),
           profilePrivateExists: Boolean(profilePrivate),

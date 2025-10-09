@@ -79,6 +79,8 @@ const AuditLog: React.FC = () => {
     { title: 'Target', dataIndex: 'targetUserId', key: 'targetUserId' },
     { title: 'Reason', dataIndex: ['details', 'reason'], key: 'reason', render: (reason: string) => reason || '—' },
     { title: 'Resource', dataIndex: ['details', 'targetResource'], key: 'targetResource', render: (value: string) => value || '—' },
+    { title: 'IP', dataIndex: ['details', 'ip'], key: 'ip', render: (value: string) => value || '—' },
+    { title: 'Request ID', dataIndex: ['details', 'requestId'], key: 'requestId', render: (value: string) => value || '—' },
   ];
 
   if (error) return <Alert message={error} type="error" showIcon />;
