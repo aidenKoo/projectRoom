@@ -90,12 +90,18 @@ export class AdminService {
       .orderBy("user.created_at", "DESC")
       .getManyAndCount();
 
+    const itemsPerPage = limit;
+    const totalPages = Math.max(Math.ceil(total / itemsPerPage), 1);
+
     return {
-      users,
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
+      items: users,
+      meta: {
+        totalItems: total,
+        itemsPerPage,
+        currentPage: page,
+        totalPages,
+        hasNextPage: page < totalPages,
+      },
     };
   }
 
