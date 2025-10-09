@@ -1,8 +1,16 @@
-import { Injectable, ForbiddenException } from "@nestjs/common";
+import { Injectable, ForbiddenException, BadRequestException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { Message } from "./entities/message.entity";
 import { MatchesService } from "../matches/matches.service";
+
+interface CreateMessagePayload {
+  matchId: number;
+  senderId: number;
+  body: string;
+  type: "text" | "image";
+  imageUrl?: string;
+}
 
 @Injectable()
 export class MessagesService {
@@ -12,12 +20,13 @@ export class MessagesService {
     private matchesService: MatchesService,
   ) {}
 
-  async create(
-    matchId: number,
-    senderId: number,
-    body: string,
-    type: "text" | "image" = "text",
-  ): Promise<Message> {
+  async create(payload: CreateMessagePayload): Promise<Message> {
+    const { matchId, senderId, body, type, imageUrl } = payload;
+
+    if (type === "text" && (!body || body.trim().length === 0)) {
+      throw new BadRequestException("Text messages must include a body.");
+    }
+
     // Verify user is part of the match
     const match = await this.matchesService.findById(matchId, senderId);
     if (!match) {
@@ -29,6 +38,7 @@ export class MessagesService {
       sender_id: senderId,
       body,
       type,
+      image_url: imageUrl,
     });
 
     return this.messagesRepository.save(message);
