@@ -3,10 +3,12 @@ import { ValidationPipe } from "@nestjs/common";
 import { SwaggerModule, DocumentBuilder } from "@nestjs/swagger";
 import { ConfigService } from "@nestjs/config";
 import { AppModule } from "./app.module";
+import { SanitizeInterceptor } from "./common/interceptors/sanitize.interceptor";
 import { initializeFirebase } from "./common/config/firebase.config";
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  app.useGlobalInterceptors(new SanitizeInterceptor());
 
   // Initialize Firebase Admin
   const configService = app.get(ConfigService);
