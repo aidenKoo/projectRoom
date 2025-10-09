@@ -78,8 +78,35 @@ export class AdminController {
 
   // 월별 코드 수동 생성
   @Post("codes/generate")
-  async generateCode() {
-    return this.adminService.generateMonthlyCode();
+  async generateCode(
+    @Req() req: any,
+    @Headers("x-audit-reason") auditReason?: string,
+  ) {
+    const accessorId = req.user?.uid;
+    if (!accessorId) {
+      throw new BadRequestException("인증 정보가 없습니다.");
+    }
+
+    const reason = auditReason?.trim();
+    if (!reason) {
+      throw new BadRequestException(
+        "민감한 변경 작업 시 X-Audit-Reason 헤더가 필요합니다.",
+      );
+    }
+
+    const forwardedFor = req.headers["x-forwarded-for"] as string | undefined;
+    const ip = forwardedFor
+      ? forwardedFor.split(",")[0]?.trim()
+      : req.ip;
+    const requestId = (req.headers["x-request-id"] as string | undefined)?.trim();
+
+    return this.adminService.generateMonthlyCode({
+      accessorId,
+      reason,
+      action: AuditAction.UPDATE_SENSITIVE_DATA,
+      ip,
+      requestId,
+    });
   }
 
   // 추천인 통계

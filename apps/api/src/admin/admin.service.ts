@@ -160,7 +160,7 @@ export class AdminService {
   }
 
   // 월별 코드 수동 생성
-  async generateMonthlyCode() {
+  async generateMonthlyCode(auditContext?: AuditContext) {
     const now = new Date();
     const year = now.getFullYear();
     const month = String(now.getMonth() + 1).padStart(2, "0");
@@ -172,6 +172,25 @@ export class AdminService {
     });
 
     if (existing) {
+      if (auditContext) {
+        await this.auditLogsService.createLog({
+          accessorId: auditContext.accessorId,
+          targetUserId: auditContext.accessorId,
+          action: auditContext.action,
+          reason: auditContext.reason,
+          targetResource: "admin.codes.generate",
+          ip: auditContext.ip,
+          requestId: auditContext.requestId,
+          details: {
+            code: existing.code,
+            month:
+              existing.month instanceof Date
+                ? existing.month.toISOString()
+                : existing.month,
+            alreadyExists: true,
+          },
+        });
+      }
       return existing;
     }
 
@@ -187,7 +206,29 @@ export class AdminService {
       isActive: true,
     });
 
-    return this.monthlyCodeRepository.save(monthlyCode);
+    const saved = await this.monthlyCodeRepository.save(monthlyCode);
+
+    if (auditContext) {
+      await this.auditLogsService.createLog({
+        accessorId: auditContext.accessorId,
+        targetUserId: auditContext.accessorId,
+        action: auditContext.action,
+        reason: auditContext.reason,
+        targetResource: "admin.codes.generate",
+        ip: auditContext.ip,
+        requestId: auditContext.requestId,
+        details: {
+          code: saved.code,
+          month:
+            saved.month instanceof Date
+              ? saved.month.toISOString()
+              : saved.month,
+          alreadyExists: false,
+        },
+      });
+    }
+
+    return saved;
   }
 
   // 추천인 통계
