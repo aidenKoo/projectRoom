@@ -10,6 +10,7 @@ import {
 import { FileInterceptor } from "@nestjs/platform-express";
 import { StorageService } from "./storage.service";
 import { FirebaseAuthGuard } from "../common/guards/firebase-auth.guard";
+import { RateLimit } from "../common/decorators/rate-limit.decorator";
 
 @Controller("storage")
 @UseGuards(FirebaseAuthGuard)
@@ -18,6 +19,7 @@ export class StorageController {
 
   @Post("upload/photo")
   @UseInterceptors(FileInterceptor("file"))
+  @RateLimit(10, 60)
   async uploadPhoto(
     @UploadedFile() file: Express.Multer.File,
     @Request() req: any,
@@ -45,6 +47,7 @@ export class StorageController {
 
   @Post("upload/profile")
   @UseInterceptors(FileInterceptor("file"))
+  @RateLimit(10, 60)
   async uploadProfilePhoto(
     @UploadedFile() file: Express.Multer.File,
     @Request() req: any,

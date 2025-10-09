@@ -7,6 +7,7 @@ import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from "@nestjs/swagg
 import { CreateLikeDto } from './dto/create-like.dto';
 import { SkipRecommendationDto } from './dto/skip-recommendation.dto';
 import { User } from '../users/entities/user.entity';
+import { RateLimit } from '../common/decorators/rate-limit.decorator';
 
 @ApiTags('match')
 @Controller('v1/match')
@@ -20,6 +21,7 @@ export class MatchController {
   ) {}
 
   @Get('recommendations')
+  @RateLimit(60, 60)
   @ApiOperation({ summary: 'Get user recommendations' })
   async getRecommendations(
     @Req() req: any,
@@ -31,6 +33,7 @@ export class MatchController {
   }
 
   @Post('like')
+  @RateLimit(30, 60)
   @ApiOperation({ summary: 'Like a user and check for a mutual match' })
   async createLike(@Req() req: any, @Body() createLikeDto: CreateLikeDto) {
     const firebaseUid = req.user.uid;
@@ -50,6 +53,7 @@ export class MatchController {
   }
 
   @Post('skip')
+  @RateLimit(30, 60)
   @ApiOperation({ summary: 'Skip a recommended user' })
   async skipRecommendation(
     @Req() req: any,

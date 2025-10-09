@@ -5,53 +5,87 @@ import {
   CallHandler,
   HttpException,
   HttpStatus,
+  Logger,
 } from "@nestjs/common";
 import { Observable } from "rxjs";
 import { RedisService } from "../cache/redis.service";
+import { Reflector } from "@nestjs/core";
+import {
+  RATE_LIMIT_KEY,
+  RateLimitOptions,
+} from "../decorators/rate-limit.decorator";
 
 @Injectable()
 export class RateLimitInterceptor implements NestInterceptor {
+  private readonly logger = new Logger(RateLimitInterceptor.name);
+
   constructor(
     private readonly redisService: RedisService,
-    private readonly limit: number = 100, // 기본 100회
-    private readonly windowSeconds: number = 60, // 기본 60초
+    private readonly reflector: Reflector,
   ) {}
 
   async intercept(
     context: ExecutionContext,
     next: CallHandler,
   ): Promise<Observable<any>> {
+    const rateLimitOptions =
+      this.reflector.getAllAndOverride<RateLimitOptions | undefined>(
+        RATE_LIMIT_KEY,
+        [context.getHandler(), context.getClass()],
+      ) ?? undefined;
+
+    if (!rateLimitOptions) {
+      return next.handle();
+    }
+
     const request = context.switchToHttp().getRequest();
     const user = request.user;
-    const ip = request.ip || request.connection.remoteAddress;
+    const ip = request.ip || request.connection?.remoteAddress;
 
     // 사용자 식별자 (로그인 시 uid, 아니면 IP)
     const identifier = user?.uid || `ip:${ip}`;
-    const key = `rate_limit:${identifier}`;
+    const handlerName = context.getHandler().name || "unknown";
+    const className = context.getClass().name || "unknown";
+    const key = `rate_limit:${identifier}:${className}:${handlerName}`;
 
-    // 현재 요청 수 조회
-    const current = await this.redisService.get(key);
-    const currentCount = current ? parseInt(current, 10) : 0;
-
-    if (currentCount >= this.limit) {
-      throw new HttpException(
-        {
-          statusCode: HttpStatus.TOO_MANY_REQUESTS,
-          message: "Too many requests. Please try again later.",
-          limit: this.limit,
-          windowSeconds: this.windowSeconds,
-        },
-        HttpStatus.TOO_MANY_REQUESTS,
-      );
+    const redisClient = this.redisService.getClient();
+    if (!redisClient?.isOpen) {
+      return next.handle();
     }
 
-    // 카운트 증가
-    if (currentCount === 0) {
-      // 첫 요청이면 TTL 설정
-      await this.redisService.set(key, "1", this.windowSeconds);
-    } else {
-      // 이미 있으면 증가
-      await this.redisService.incr(key);
+    const { limit, windowSeconds } = rateLimitOptions;
+
+    try {
+      const currentCount = await this.redisService.incr(key);
+
+      if (!currentCount) {
+        return next.handle();
+      }
+
+      if (currentCount === 1) {
+        await this.redisService.expire(key, windowSeconds);
+      }
+
+      if (currentCount > limit) {
+        throw new HttpException(
+          {
+            statusCode: HttpStatus.TOO_MANY_REQUESTS,
+            message: "Too many requests. Please try again later.",
+            limit,
+            windowSeconds,
+          },
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+      }
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      this.logger.warn(
+        `Rate limit check failed (${className}.${handlerName}): ${error?.message ?? error}`,
+      );
+      // Redis 오류 시에는 레이트리밋을 우회하고 요청을 진행
     }
 
     return next.handle();

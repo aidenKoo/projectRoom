@@ -9,7 +9,7 @@ import { createClient, RedisClientType } from "redis";
 
 @Injectable()
 export class RedisService implements OnModuleInit, OnModuleDestroy {
-  private client: RedisClientType;
+  private client?: RedisClientType;
   private readonly logger = new Logger(RedisService.name);
 
   constructor(private configService: ConfigService) {}
@@ -42,10 +42,12 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   async onModuleDestroy() {
-    await this.client.quit();
+    if (this.client) {
+      await this.client.quit();
+    }
   }
 
-  getClient(): RedisClientType {
+  getClient(): RedisClientType | undefined {
     return this.client;
   }
 
@@ -53,6 +55,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
    * Set a key-value pair with optional TTL (in seconds)
    */
   async set(key: string, value: string, ttl?: number): Promise<void> {
+    if (!this.client) return;
     if (ttl) {
       await this.client.setEx(key, ttl, value);
     } else {
@@ -64,6 +67,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
    * Get a value by key
    */
   async get(key: string): Promise<string | null> {
+    if (!this.client) return null;
     return this.client.get(key);
   }
 
@@ -71,6 +75,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
    * Delete a key
    */
   async del(key: string): Promise<void> {
+    if (!this.client) return;
     await this.client.del(key);
   }
 
@@ -78,6 +83,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
    * Check if a key exists
    */
   async exists(key: string): Promise<boolean> {
+    if (!this.client) return false;
     const result = await this.client.exists(key);
     return result === 1;
   }
@@ -86,6 +92,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
    * Set expiration time for a key (in seconds)
    */
   async expire(key: string, seconds: number): Promise<void> {
+    if (!this.client) return;
     await this.client.expire(key, seconds);
   }
 
@@ -93,6 +100,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
    * Get all keys matching a pattern
    */
   async keys(pattern: string): Promise<string[]> {
+    if (!this.client) return [];
     return this.client.keys(pattern);
   }
 
@@ -100,6 +108,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
    * Increment a value
    */
   async incr(key: string): Promise<number> {
+    if (!this.client) return 0;
     return this.client.incr(key);
   }
 
@@ -107,6 +116,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
    * Decrement a value
    */
   async decr(key: string): Promise<number> {
+    if (!this.client) return 0;
     return this.client.decr(key);
   }
 

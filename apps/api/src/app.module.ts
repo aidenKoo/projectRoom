@@ -1,4 +1,5 @@
 import { Module } from "@nestjs/common";
+import { APP_INTERCEPTOR, Reflector } from "@nestjs/core";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { ScheduleModule } from "@nestjs/schedule";
@@ -25,6 +26,8 @@ import { AnalyticsModule } from "./analytics/analytics.module";
 import { WebsocketModule } from "./websocket/websocket.module";
 
 import { StatisticsModule } from "./statistics/statistics.module";
+import { RateLimitInterceptor } from "./common/interceptors/rate-limit.interceptor";
+import { RedisService } from "./common/cache/redis.service";
 
 @Module({
   imports: [
@@ -69,6 +72,14 @@ import { StatisticsModule } from "./statistics/statistics.module";
     ConversationsModule,
     AdminModule,
     StorageModule,
+  ],
+  providers: [
+    {
+      provide: APP_INTERCEPTOR,
+      useFactory: (redisService: RedisService, reflector: Reflector) =>
+        new RateLimitInterceptor(redisService, reflector),
+      inject: [RedisService, Reflector],
+    },
   ],
 })
 export class AppModule {}

@@ -14,6 +14,10 @@ type OptionRecord = {
   isActive: boolean;
 };
 
+type ReasonContext =
+  | { type: 'delete'; id: number }
+  | { type: 'toggle'; id: number; nextStatus: boolean };
+
 const OptionEditor: React.FC<{ category: string }> = ({ category }) => {
   const [options, setOptions] = useState<OptionRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -21,7 +25,7 @@ const OptionEditor: React.FC<{ category: string }> = ({ category }) => {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingOption, setEditingOption] = useState<any | null>(null);
   const [reasonModalVisible, setReasonModalVisible] = useState(false);
-  const [reasonTargetId, setReasonTargetId] = useState<number | null>(null);
+  const [reasonContext, setReasonContext] = useState<ReasonContext | null>(null);
   const [auditReasonText, setAuditReasonText] = useState('');
   const [auditReasonError, setAuditReasonError] = useState('');
   const [reasonSubmitting, setReasonSubmitting] = useState(false);
@@ -31,7 +35,16 @@ const OptionEditor: React.FC<{ category: string }> = ({ category }) => {
     try {
       setLoading(true);
       const response = await api.get(`/survey-options/category/${category}`);
-      setOptions(response.data ?? []);
+      const data: OptionRecord[] = Array.isArray(response.data)
+        ? response.data.map((item: any) => ({
+            id: item.id,
+            label: item.label ?? '',
+            value: item.value,
+            sortOrder: item.sortOrder ?? item.sort_order ?? 0,
+            isActive: item.isActive ?? item.is_active ?? true,
+          }))
+        : [];
+      setOptions(data);
     } catch (err) {
       setError(`Failed to fetch ${category} options.`);
     } finally {
@@ -48,9 +61,34 @@ const OptionEditor: React.FC<{ category: string }> = ({ category }) => {
       const values = await form.validateFields();
       const { auditReason, sortOrder, ...rest } = values;
       const trimmedReason = auditReason.trim();
+
+      if (!trimmedReason) {
+        form.setFields([
+          {
+            name: 'auditReason',
+            errors: ['Please provide a reason for this change.'],
+          },
+        ]);
+        return;
+      }
+
+      const numericSortOrder = Number(sortOrder);
+
+      if (Number.isNaN(numericSortOrder)) {
+        form.setFields([
+          {
+            name: 'sortOrder',
+            errors: ['Sort order must be a number.'],
+          },
+        ]);
+        return;
+      }
+
       const payload = {
         ...rest,
-        sortOrder: Number(sortOrder),
+        label: rest.label?.trim() ?? '',
+        value: rest.value.trim(),
+        sortOrder: numericSortOrder,
       };
 
       const headers = {
@@ -96,35 +134,73 @@ const OptionEditor: React.FC<{ category: string }> = ({ category }) => {
     setIsModalVisible(true);
   };
 
-  const openDeleteModal = (id: number) => {
-    setReasonTargetId(id);
+  const openReasonModal = (context: ReasonContext) => {
+    setReasonContext(context);
     setAuditReasonText('');
     setAuditReasonError('');
     setReasonModalVisible(true);
   };
 
-  const confirmDelete = async () => {
-    if (reasonTargetId == null) return;
+  const confirmReasonAction = async () => {
+    if (!reasonContext) return;
     const trimmed = auditReasonText.trim();
     if (!trimmed) {
-      setAuditReasonError('Please provide the reason for deleting this option.');
+      setAuditReasonError('Please provide the reason for this action.');
       return;
     }
     setReasonSubmitting(true);
     try {
-      await api.delete(`/survey-options/${reasonTargetId}`, {
-        headers: { 'X-Audit-Reason': trimmed },
-      });
-      message.success('Option deleted successfully');
+      if (reasonContext.type === 'delete') {
+        await api.delete(`/survey-options/${reasonContext.id}`, {
+          headers: { 'X-Audit-Reason': trimmed },
+        });
+        message.success('Option deleted successfully');
+      } else if (reasonContext.type === 'toggle') {
+        await api.patch(`/survey-options/${reasonContext.id}/toggle`, null, {
+          headers: { 'X-Audit-Reason': trimmed },
+        });
+        message.success(
+          reasonContext.nextStatus
+            ? 'Option activated successfully'
+            : 'Option deactivated successfully',
+        );
+      }
       setReasonModalVisible(false);
       setAuditReasonText('');
+      setReasonContext(null);
       fetchOptions();
     } catch (err) {
-      message.error('Failed to delete option');
+      if (reasonContext.type === 'delete') {
+        message.error('Failed to delete option');
+      } else {
+        message.error('Failed to toggle option state');
+      }
     } finally {
       setReasonSubmitting(false);
     }
   };
+
+  const reasonModalTitle = (() => {
+    if (!reasonContext) return 'Access Reason Required';
+    if (reasonContext.type === 'delete') {
+      return 'Access Reason Required (Delete Option)';
+    }
+    return reasonContext.nextStatus
+      ? 'Access Reason Required (Activate Option)'
+      : 'Access Reason Required (Deactivate Option)';
+  })();
+
+  const reasonModalPrompt = (() => {
+    if (!reasonContext) {
+      return 'Please describe the reason for this action.';
+    }
+    if (reasonContext.type === 'delete') {
+      return 'Please describe why you are deleting this option.';
+    }
+    return reasonContext.nextStatus
+      ? 'Please describe why you are activating this option.'
+      : 'Please describe why you are deactivating this option.';
+  })();
 
   const columns = [
     { title: 'ID', dataIndex: 'id', key: 'id' },
@@ -145,7 +221,25 @@ const OptionEditor: React.FC<{ category: string }> = ({ category }) => {
       render: (_: any, record: OptionRecord) => (
         <span>
           <Button type="link" onClick={() => openEditModal(record)}>Edit</Button>
-          <Button type="link" danger onClick={() => openDeleteModal(record.id)}>Delete</Button>
+          <Button
+            type="link"
+            onClick={() =>
+              openReasonModal({
+                type: 'toggle',
+                id: record.id,
+                nextStatus: !record.isActive,
+              })
+            }
+          >
+            {record.isActive ? 'Deactivate' : 'Activate'}
+          </Button>
+          <Button
+            type="link"
+            danger
+            onClick={() => openReasonModal({ type: 'delete', id: record.id })}
+          >
+            Delete
+          </Button>
         </span>
       ),
     },
@@ -186,22 +280,22 @@ const OptionEditor: React.FC<{ category: string }> = ({ category }) => {
         </Form>
       </Modal>
       <Modal
-        title="Access Reason Required"
+        title={reasonModalTitle}
         visible={reasonModalVisible}
-        onOk={confirmDelete}
-        okText="Delete"
+        onOk={confirmReasonAction}
+        okText={reasonContext?.type === 'delete' ? 'Delete' : reasonContext?.nextStatus ? 'Activate' : 'Deactivate'}
         confirmLoading={reasonSubmitting}
         onCancel={() => {
           if (!reasonSubmitting) {
             setReasonModalVisible(false);
             setAuditReasonText('');
             setAuditReasonError('');
-            setReasonTargetId(null);
+            setReasonContext(null);
           }
         }}
         cancelButtonProps={{ disabled: reasonSubmitting }}
       >
-        <p>Please describe why you are deleting this option.</p>
+        <p>{reasonModalPrompt}</p>
         <Input.TextArea
           rows={3}
           maxLength={255}
