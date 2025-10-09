@@ -5,22 +5,27 @@ import {
   UploadedFile,
   Request,
   BadRequestException,
+  UseGuards,
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { StorageService } from "./storage.service";
+import { FirebaseAuthGuard } from "../common/guards/firebase-auth.guard";
 
 @Controller("storage")
+@UseGuards(FirebaseAuthGuard)
 export class StorageController {
   constructor(private readonly storageService: StorageService) {}
 
   @Post("upload/photo")
-  // @UseGuards(FirebaseAuthGuard)
   @UseInterceptors(FileInterceptor("file"))
   async uploadPhoto(
     @UploadedFile() file: Express.Multer.File,
     @Request() req: any,
   ) {
-    const userId = req.user?.uid || "test-user"; // Placeholder
+    const userId = req.user?.uid;
+    if (!userId) {
+      throw new BadRequestException("인증 정보가 없습니다.");
+    }
 
     if (!file) {
       throw new BadRequestException("No file uploaded");
@@ -39,13 +44,15 @@ export class StorageController {
   }
 
   @Post("upload/profile")
-  // @UseGuards(FirebaseAuthGuard)
   @UseInterceptors(FileInterceptor("file"))
   async uploadProfilePhoto(
     @UploadedFile() file: Express.Multer.File,
     @Request() req: any,
   ) {
-    const userId = req.user?.uid || "test-user"; // Placeholder
+    const userId = req.user?.uid;
+    if (!userId) {
+      throw new BadRequestException("인증 정보가 없습니다.");
+    }
 
     if (!file) {
       throw new BadRequestException("No file uploaded");

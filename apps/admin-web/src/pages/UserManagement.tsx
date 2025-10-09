@@ -1,10 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Input, Spin, Alert, Modal, Descriptions, Tag, Avatar, Typography } from 'antd';
-import { UserOutlined } from '@ant-design/icons';
+import { Table, Input, Spin, Alert, Modal, Descriptions, Tag, Typography, Button } from 'antd';
 import api from '../services/api';
-import { debounce } from 'lodash';
-
-const { Title, Text } = Typography;
+const { Title } = Typography;
 const { Search } = Input;
 
 const UserManagement: React.FC = () => {
@@ -13,6 +10,7 @@ const UserManagement: React.FC = () => {
   const [error, setError] = useState('');
   const [pagination, setPagination] = useState({ current: 1, pageSize: 10, total: 0 });
   const [searchTerm, setSearchTerm] = useState('');
+  const [searchInput, setSearchInput] = useState('');
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [modalLoading, setModalLoading] = useState(false);
@@ -40,17 +38,31 @@ const UserManagement: React.FC = () => {
     fetchUsers(pagination.current, pagination.pageSize, searchTerm);
   }, [pagination.current, pagination.pageSize, searchTerm]);
 
+  useEffect(() => {
+    const handler = window.setTimeout(() => {
+      setSearchTerm((prev) => {
+        if (prev === searchInput) {
+          return prev;
+        }
+        return searchInput;
+      });
+      setPagination((prev) => {
+        if (prev.current === 1) {
+          return prev;
+        }
+        return { ...prev, current: 1 };
+      });
+    }, 500);
+
+    return () => window.clearTimeout(handler);
+  }, [searchInput]);
+
   const handleTableChange = (pagination: any) => {
     setPagination(pagination);
   };
 
-  const debouncedSearch = debounce((value: string) => {
-    setSearchTerm(value);
-    setPagination({ ...pagination, current: 1 }); // Reset to first page on search
-  }, 500);
-
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
-    debouncedSearch(e.target.value);
+    setSearchInput(e.target.value);
   };
 
   const showUserDetails = async (userId: string) => {

@@ -1,9 +1,18 @@
-import { Controller, Get, Query, Param, ParseIntPipe } from "@nestjs/common";
+import {
+  Controller,
+  Get,
+  Query,
+  Param,
+  ParseIntPipe,
+  UseGuards,
+} from "@nestjs/common";
 import { AuditAction } from "./entities/audit-log.entity";
 import { AuditLogsService } from "./audit-logs.service";
+import { FirebaseAuthGuard } from "../common/guards/firebase-auth.guard";
+import { AdminGuard } from "../common/guards/admin.guard";
 
 @Controller("audit-logs")
-// @UseGuards(FirebaseAuthGuard, AdminGuard)
+@UseGuards(FirebaseAuthGuard, AdminGuard)
 export class AuditLogsController {
   constructor(private readonly auditLogsService: AuditLogsService) {}
 
@@ -13,8 +22,15 @@ export class AuditLogsController {
     @Query("limit", new ParseIntPipe({ optional: true })) limit = 50,
     @Query("action") action?: AuditAction,
     @Query("targetUid") targetUid?: string,
+    @Query("actorUid") actorUid?: string,
   ) {
-    return this.auditLogsService.findAll(page, limit, action, targetUid);
+    return this.auditLogsService.findAll(
+      page,
+      limit,
+      action,
+      targetUid,
+      actorUid,
+    );
   }
 
   @Get("user/:uid")

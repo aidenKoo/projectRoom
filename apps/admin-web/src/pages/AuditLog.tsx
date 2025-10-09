@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Table, Spin, Alert, Typography, Tag } from 'antd';
+import { Table, Alert, Typography, Tag } from 'antd';
 import api from '../services/api';
 
 const { Title } = Typography;

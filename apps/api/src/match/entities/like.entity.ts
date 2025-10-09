@@ -23,12 +23,12 @@ export class Like {
   @Column({ name: "to_uid", type: "varchar", length: 64 })
   toUserId: string;
 
-  @ManyToOne(() => User)
-  @JoinColumn({ name: "from_uid" })
+  @ManyToOne(() => User, { createForeignKeyConstraints: false })
+  @JoinColumn({ name: "from_uid", referencedColumnName: "firebase_uid" })
   fromUser: User;
 
-  @ManyToOne(() => User)
-  @JoinColumn({ name: "to_uid" })
+  @ManyToOne(() => User, { createForeignKeyConstraints: false })
+  @JoinColumn({ name: "to_uid", referencedColumnName: "firebase_uid" })
   toUser: User;
 
   @CreateDateColumn({ name: "created_at" })

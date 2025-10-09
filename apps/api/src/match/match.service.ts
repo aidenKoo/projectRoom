@@ -1,10 +1,11 @@
-import { Injectable, NotFoundException, ForbiddenException } from "@nestjs/common";
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, LessThan } from "typeorm";
 import { Like } from "./entities/like.entity";
 import { Match } from "./entities/match.entity";
 import { Recommendation } from "./entities/recommendation.entity";
 import { MatchScorerService } from "./match-scorer.service";
+import { Conversation } from "../conversations/entities/conversation.entity";
 
 @Injectable()
 export class MatchService {
@@ -15,6 +16,8 @@ export class MatchService {
     private readonly matchRepository: Repository<Match>,
     @InjectRepository(Recommendation)
     private readonly recommendationRepository: Repository<Recommendation>,
+    @InjectRepository(Conversation)
+    private readonly conversationRepository: Repository<Conversation>,
     private readonly scorerService: MatchScorerService,
   ) {}
 
@@ -205,8 +208,49 @@ export class MatchService {
     matchId: string,
     answers: Record<string, string>,
   ): Promise<void> {
-    // TODO: 실제 답변 저장 로직 구현
-    // 예: conversations 또는 match_metadata 테이블에 저장
-    console.log('Saving initial answers:', { userId, matchId, answers });
+    const match = await this.findMatchById(matchId, userId);
+
+    const sanitizedAnswers = Object.entries(answers || {}).reduce<Record<string, string>>(
+      (acc, [key, value]) => {
+        if (typeof value === "string") {
+          const trimmed = value.trim();
+          if (trimmed.length > 0) {
+            acc[key] = trimmed.slice(0, 500);
+          }
+        } else if (value !== undefined && value !== null) {
+          acc[key] = String(value).slice(0, 500);
+        }
+        return acc;
+      },
+      {},
+    );
+
+    if (Object.keys(sanitizedAnswers).length === 0) {
+      throw new BadRequestException("답변이 비어 있습니다.");
+    }
+
+    let conversation = await this.conversationRepository.findOne({
+      where: { matchId },
+    });
+
+    if (!conversation) {
+      conversation = this.conversationRepository.create({
+        matchId,
+        userAId: match.uidA,
+        userBId: match.uidB,
+        initialAnswers: {},
+      });
+    }
+
+    const existingAnswers = conversation.initialAnswers ?? {};
+    const submittedAt = new Date().toISOString();
+
+    existingAnswers[userId] = {
+      answers: sanitizedAnswers,
+      submittedAt,
+    };
+
+    conversation.initialAnswers = existingAnswers;
+    await this.conversationRepository.save(conversation);
   }
 }

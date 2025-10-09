@@ -50,15 +50,17 @@ export class MatchScorerService {
       userId: myUser.id,
     });
 
+    const myFirebaseUid = myUser.firebase_uid;
+
     const likedUserIds = (
       await this.likeRepository.find({
-        where: { fromUserId: myUser.id },
+        where: { fromUserId: myFirebaseUid },
         select: ['toUserId'],
       })
     ).map((l) => l.toUserId);
 
     const matchedUsersQuery = await this.matchRepository.find({
-      where: [{ uidA: myUser.id }, { uidB: myUser.id }],
+      where: [{ uidA: myFirebaseUid }, { uidB: myFirebaseUid }],
     });
     const matchedUserIds = matchedUsersQuery.flatMap((m) => [m.uidA, m.uidB]);
 
@@ -71,7 +73,7 @@ export class MatchScorerService {
 
     const excludedUserIds = [
       ...new Set([
-        userId,
+        myFirebaseUid,
         ...likedUserIds,
         ...matchedUserIds,
         ...skippedUserIds,

@@ -2,8 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
 import { Layout, Menu, Spin, Button, theme as antdTheme } from 'antd';
-import { onAuthStateChanged, User } from 'firebase/auth';
-import { auth } from './firebase';
+import { onAuthStateChanged, type User } from 'firebase/auth';
+import { auth } from './firebase.ts';
 
 import { DashboardOutlined, UserOutlined, QrcodeOutlined, UnorderedListOutlined, HistoryOutlined } from '@ant-design/icons';
 
@@ -16,7 +16,7 @@ import AuditLog from './pages/AuditLog';
 
 const { Header, Content, Sider } = Layout;
 
-const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
+const ProtectedRoute = ({ children }: { children: React.ReactElement }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 

@@ -13,6 +13,7 @@ import { Match } from '../match/entities/match.entity';
 import { Recommendation } from '../match/entities/recommendation.entity';
 import { Message } from '../conversations/entities/message.entity';
 import { Repository } from 'typeorm';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 describe('AdminService', () => {
   let service: AdminService;
@@ -64,6 +65,12 @@ describe('AdminService', () => {
         {
           provide: getRepositoryToken(Message),
           useClass: Repository,
+        },
+        {
+          provide: AuditLogsService,
+          useValue: {
+            createLog: jest.fn(),
+          },
         },
       ],
     }).compile();

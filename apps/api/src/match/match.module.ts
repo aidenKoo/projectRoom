@@ -12,6 +12,7 @@ import { User } from '../users/entities/user.entity';
 import { Profile } from '../profiles/entities/profile.entity';
 import { ProfilePrivate } from '../profiles-private/entities/profile-private.entity';
 import { Preference } from '../preferences/entities/preference.entity';
+import { Conversation } from '../conversations/entities/conversation.entity';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { Preference } from '../preferences/entities/preference.entity';
       Profile,
       ProfilePrivate,
       Preference,
+      Conversation,
     ]),
     HttpModule,
     ConfigModule,

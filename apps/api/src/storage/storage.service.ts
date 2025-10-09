@@ -1,22 +1,41 @@
-import { Injectable, BadRequestException } from "@nestjs/common";
+import { Injectable, BadRequestException, InternalServerErrorException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import * as admin from "firebase-admin";
 import { v4 as uuidv4 } from "uuid";
 
 @Injectable()
 export class StorageService {
-  private bucket: admin.storage.Storage;
+  private storage?: admin.storage.Storage;
+  private bucketName?: string;
 
   constructor(private configService: ConfigService) {
     // Firebase Storage bucket 초기화
     if (admin.apps.length) {
-      const bucketName = this.configService.get("FIREBASE_STORAGE_BUCKET");
-      if (bucketName) {
-        this.bucket = admin.storage();
-      } else {
+      this.storage = admin.storage();
+      this.bucketName =
+        this.configService.get<string>("FIREBASE_STORAGE_BUCKET") ||
+        (this.storage.app.options.storageBucket as string | undefined);
+
+      if (!this.bucketName) {
         console.warn("Firebase Storage bucket not configured");
       }
     }
+  }
+
+  private getBucket() {
+    if (!this.storage) {
+      throw new InternalServerErrorException(
+        "Firebase Storage가 초기화되지 않았습니다.",
+      );
+    }
+
+    if (!this.bucketName) {
+      throw new InternalServerErrorException(
+        "Firebase Storage bucket 설정이 필요합니다.",
+      );
+    }
+
+    return this.storage.bucket(this.bucketName);
   }
 
   /**
@@ -60,8 +79,10 @@ export class StorageService {
     const objectPath = `users/${userId}/${folder}/${fileName}`;
 
     try {
+      const bucket = this.getBucket();
+
       // Firebase Storage에 업로드
-      const bucketFile = this.bucket.bucket().file(objectPath);
+      const bucketFile = bucket.file(objectPath);
 
       await bucketFile.save(file.buffer, {
         metadata: {
@@ -75,7 +96,7 @@ export class StorageService {
 
       // 공개 URL 생성 (옵션)
       await bucketFile.makePublic();
-      const publicUrl = `https://storage.googleapis.com/${this.bucket.bucket().name}/${objectPath}`;
+      const publicUrl = `https://storage.googleapis.com/${bucket.name}/${objectPath}`;
 
       return {
         objectPath,
@@ -92,7 +113,8 @@ export class StorageService {
    */
   async deleteFile(objectPath: string): Promise<void> {
     try {
-      await this.bucket.bucket().file(objectPath).delete();
+      const bucket = this.getBucket();
+      await bucket.file(objectPath).delete();
     } catch (error) {
       console.error("Failed to delete file:", error.message);
     }
@@ -107,13 +129,11 @@ export class StorageService {
     objectPath: string,
     expiresInMinutes: number = 60,
   ): Promise<string> {
-    const [url] = await this.bucket
-      .bucket()
-      .file(objectPath)
-      .getSignedUrl({
-        action: "read",
-        expires: Date.now() + expiresInMinutes * 60 * 1000,
-      });
+    const bucket = this.getBucket();
+    const [url] = await bucket.file(objectPath).getSignedUrl({
+      action: "read",
+      expires: Date.now() + expiresInMinutes * 60 * 1000,
+    });
 
     return url;
   }

@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { User } from "../users/entities/user.entity";
@@ -12,6 +12,14 @@ import { Match } from "../match/entities/match.entity";
 import { Recommendation } from "../match/entities/recommendation.entity";
 import { Message } from "../conversations/entities/message.entity";
 import * as crypto from "crypto";
+import { AuditLogsService } from "../audit-logs/audit-logs.service";
+import { AuditAction } from "../audit-logs/entities/audit-log.entity";
+
+interface AuditContext {
+  accessorId: string;
+  reason: string;
+  action: AuditAction;
+}
 
 @Injectable()
 export class AdminService {
@@ -36,6 +44,7 @@ export class AdminService {
     private readonly recommendationRepository: Repository<Recommendation>,
     @InjectRepository(Message)
     private readonly messageRepository: Repository<Message>,
+    private readonly auditLogsService: AuditLogsService,
   ) {}
 
   // KPI 메트릭
@@ -91,12 +100,12 @@ export class AdminService {
   }
 
   // 사용자 상세 조회 (비공개 포함)
-  async getUserDetail(uid: string) {
+  async getUserDetail(uid: string, auditContext?: AuditContext) {
     const user = await this.userRepository.findOne({
       where: { firebase_uid: uid },
     });
     if (!user) {
-      throw new Error("User not found");
+      throw new NotFoundException("User not found");
     }
 
     const profile = await this.profileRepository.findOne({
@@ -109,12 +118,28 @@ export class AdminService {
       where: { userId: user.id },
     });
 
-    return {
+    const payload = {
       user,
       profile,
       profilePrivate,
       preference,
     };
+
+    if (auditContext) {
+      await this.auditLogsService.createLog({
+        accessorId: auditContext.accessorId,
+        targetUserId: uid,
+        action: auditContext.action,
+        reason: auditContext.reason,
+        targetResource: "admin.users.detail",
+        details: {
+          profileExists: Boolean(profile),
+          profilePrivateExists: Boolean(profilePrivate),
+        },
+      });
+    }
+
+    return payload;
   }
 
   // 월별 코드 목록

@@ -12,9 +12,11 @@ import { Like } from "../match/entities/like.entity";
 import { Match } from "../match/entities/match.entity";
 import { Recommendation } from "../match/entities/recommendation.entity";
 import { Message } from "../conversations/entities/message.entity";
+import { AuditLogsModule } from "../audit-logs/audit-logs.module";
 
 @Module({
   imports: [
+    AuditLogsModule,
     TypeOrmModule.forFeature([
       User,
       Profile,

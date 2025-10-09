@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Table, Button, Spin, Alert, Modal, Form, Input, Select, message, Popconfirm, Tabs } from 'antd';
+import { Table, Button, Spin, Alert, Modal, Form, Input, message, Popconfirm, Tabs } from 'antd';
 import api from '../services/api';
 
 const { TabPane } = Tabs;

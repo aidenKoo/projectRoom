@@ -1,6 +1,6 @@
 
 import axios from 'axios';
-import { auth } from './firebase'; // Assuming firebase config is in firebase.ts
+import { auth } from '../firebase.ts';
 
 const api = axios.create({
   baseURL: 'http://localhost:3001/v1',
