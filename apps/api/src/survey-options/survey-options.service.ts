@@ -4,17 +4,55 @@ import { Repository } from "typeorm";
 import { SurveyOption, OptionCategory } from "./entities/survey-option.entity";
 import { CreateSurveyOptionDto } from "./dto/create-survey-option.dto";
 import { UpdateSurveyOptionDto } from "./dto/update-survey-option.dto";
+import { AuditLogsService } from "../audit-logs/audit-logs.service";
+import { AuditAction } from "../audit-logs/entities/audit-log.entity";
+
+interface AuditContext {
+  accessorId: string;
+  reason: string;
+  action: AuditAction;
+  ip?: string;
+  requestId?: string;
+  userAgent?: string;
+}
 
 @Injectable()
 export class SurveyOptionsService {
   constructor(
     @InjectRepository(SurveyOption)
     private readonly surveyOptionRepository: Repository<SurveyOption>,
+    private readonly auditLogsService: AuditLogsService,
   ) {}
 
-  async create(createDto: CreateSurveyOptionDto): Promise<SurveyOption> {
+  async create(
+    createDto: CreateSurveyOptionDto,
+    auditContext?: AuditContext,
+  ): Promise<SurveyOption> {
     const option = this.surveyOptionRepository.create(createDto);
-    return this.surveyOptionRepository.save(option);
+    const saved = await this.surveyOptionRepository.save(option);
+
+    if (auditContext) {
+      await this.auditLogsService.createLog({
+        accessorId: auditContext.accessorId,
+        targetUserId: auditContext.accessorId,
+        action: auditContext.action,
+        reason: auditContext.reason,
+        targetResource: "survey-options:create",
+        ip: auditContext.ip,
+        requestId: auditContext.requestId,
+        details: {
+          id: saved.id,
+          category: saved.category,
+          value: saved.value,
+          sortOrder: saved.sortOrder,
+          isActive: saved.isActive,
+          userAgent: auditContext.userAgent,
+          operation: "create",
+        },
+      });
+    }
+
+    return saved;
   }
 
   async findAll(): Promise<SurveyOption[]> {
@@ -41,20 +79,88 @@ export class SurveyOptionsService {
   async update(
     id: number,
     updateDto: UpdateSurveyOptionDto,
+    auditContext?: AuditContext,
   ): Promise<SurveyOption> {
     const option = await this.findOne(id);
     Object.assign(option, updateDto);
-    return this.surveyOptionRepository.save(option);
+    const saved = await this.surveyOptionRepository.save(option);
+
+    if (auditContext) {
+      await this.auditLogsService.createLog({
+        accessorId: auditContext.accessorId,
+        targetUserId: auditContext.accessorId,
+        action: auditContext.action,
+        reason: auditContext.reason,
+        targetResource: `survey-options:${id}`,
+        ip: auditContext.ip,
+        requestId: auditContext.requestId,
+        details: {
+          id,
+          category: saved.category,
+          value: saved.value,
+          sortOrder: saved.sortOrder,
+          isActive: saved.isActive,
+          userAgent: auditContext.userAgent,
+          operation: "update",
+        },
+      });
+    }
+
+    return saved;
   }
 
-  async remove(id: number): Promise<void> {
+  async remove(id: number, auditContext?: AuditContext): Promise<void> {
     const option = await this.findOne(id);
     await this.surveyOptionRepository.remove(option);
+
+    if (auditContext) {
+      await this.auditLogsService.createLog({
+        accessorId: auditContext.accessorId,
+        targetUserId: auditContext.accessorId,
+        action: auditContext.action,
+        reason: auditContext.reason,
+        targetResource: `survey-options:${id}`,
+        ip: auditContext.ip,
+        requestId: auditContext.requestId,
+        details: {
+          id,
+          category: option.category,
+          value: option.value,
+          sortOrder: option.sortOrder,
+          isActive: option.isActive,
+          userAgent: auditContext.userAgent,
+          operation: "delete",
+        },
+      });
+    }
   }
 
-  async toggleActive(id: number): Promise<SurveyOption> {
+  async toggleActive(id: number, auditContext?: AuditContext): Promise<SurveyOption> {
     const option = await this.findOne(id);
     option.isActive = !option.isActive;
-    return this.surveyOptionRepository.save(option);
+    const saved = await this.surveyOptionRepository.save(option);
+
+    if (auditContext) {
+      await this.auditLogsService.createLog({
+        accessorId: auditContext.accessorId,
+        targetUserId: auditContext.accessorId,
+        action: auditContext.action,
+        reason: auditContext.reason,
+        targetResource: `survey-options:${id}`,
+        ip: auditContext.ip,
+        requestId: auditContext.requestId,
+        details: {
+          id,
+          category: saved.category,
+          value: saved.value,
+          sortOrder: saved.sortOrder,
+          isActive: saved.isActive,
+          userAgent: auditContext.userAgent,
+          operation: "toggle",
+        },
+      });
+    }
+
+    return saved;
   }
 }
