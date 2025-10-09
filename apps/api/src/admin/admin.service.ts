@@ -21,6 +21,7 @@ interface AuditContext {
   action: AuditAction;
   ip?: string | null;
   requestId?: string | null;
+  userAgent?: string | null;
 }
 
 @Injectable()
@@ -145,6 +146,7 @@ export class AdminService {
         details: {
           profileExists: Boolean(profile),
           profilePrivateExists: Boolean(profilePrivate),
+          userAgent: auditContext.userAgent,
         },
       });
     }
@@ -172,25 +174,26 @@ export class AdminService {
     });
 
     if (existing) {
-      if (auditContext) {
-        await this.auditLogsService.createLog({
-          accessorId: auditContext.accessorId,
-          targetUserId: auditContext.accessorId,
-          action: auditContext.action,
-          reason: auditContext.reason,
-          targetResource: "admin.codes.generate",
-          ip: auditContext.ip,
-          requestId: auditContext.requestId,
-          details: {
-            code: existing.code,
-            month:
-              existing.month instanceof Date
-                ? existing.month.toISOString()
-                : existing.month,
-            alreadyExists: true,
-          },
-        });
-      }
+    if (auditContext) {
+      await this.auditLogsService.createLog({
+        accessorId: auditContext.accessorId,
+        targetUserId: auditContext.accessorId,
+        action: auditContext.action,
+        reason: auditContext.reason,
+        targetResource: "admin.codes.generate",
+        ip: auditContext.ip,
+        requestId: auditContext.requestId,
+        details: {
+          code: existing.code,
+          month:
+            existing.month instanceof Date
+              ? existing.month.toISOString()
+              : existing.month,
+          alreadyExists: true,
+          userAgent: auditContext.userAgent,
+        },
+      });
+    }
       return existing;
     }
 
@@ -224,6 +227,7 @@ export class AdminService {
               ? saved.month.toISOString()
               : saved.month,
           alreadyExists: false,
+          userAgent: auditContext.userAgent,
         },
       });
     }

@@ -14,6 +14,7 @@ import { AdminService } from "./admin.service";
 import { FirebaseAuthGuard } from "../common/guards/firebase-auth.guard";
 import { AdminGuard } from "../common/guards/admin.guard";
 import { AuditAction } from "../audit-logs/entities/audit-log.entity";
+import { extractRequestContext } from "../common/utils/request-context.util";
 
 @Controller("admin")
 @UseGuards(FirebaseAuthGuard, AdminGuard)
@@ -55,11 +56,7 @@ export class AdminController {
       );
     }
 
-    const forwardedFor = req.headers["x-forwarded-for"] as string | undefined;
-    const ip = forwardedFor
-      ? forwardedFor.split(",")[0]?.trim()
-      : req.ip;
-    const requestId = (req.headers["x-request-id"] as string | undefined)?.trim();
+    const { ip, requestId, userAgent } = extractRequestContext(req);
 
     return this.adminService.getUserDetail(uid, {
       accessorId,
@@ -67,6 +64,7 @@ export class AdminController {
       action: AuditAction.READ_PRIVATE_PROFILE,
       ip,
       requestId,
+      userAgent,
     });
   }
 
@@ -94,11 +92,7 @@ export class AdminController {
       );
     }
 
-    const forwardedFor = req.headers["x-forwarded-for"] as string | undefined;
-    const ip = forwardedFor
-      ? forwardedFor.split(",")[0]?.trim()
-      : req.ip;
-    const requestId = (req.headers["x-request-id"] as string | undefined)?.trim();
+    const { ip, requestId, userAgent } = extractRequestContext(req);
 
     return this.adminService.generateMonthlyCode({
       accessorId,
@@ -106,6 +100,7 @@ export class AdminController {
       action: AuditAction.UPDATE_SENSITIVE_DATA,
       ip,
       requestId,
+      userAgent,
     });
   }
 
