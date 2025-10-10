@@ -1,4 +1,8 @@
-import { Injectable, BadRequestException, InternalServerErrorException } from "@nestjs/common";
+import {
+  Injectable,
+  BadRequestException,
+  InternalServerErrorException,
+} from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import * as admin from "firebase-admin";
 import { v4 as uuidv4 } from "uuid";

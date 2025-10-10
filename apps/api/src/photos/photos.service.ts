@@ -61,10 +61,9 @@ export class PhotosService {
       .addOrderBy("photo.created_at", "ASC");
 
     if (!options.includePending) {
-      qb.andWhere(
-        "(meta.status IS NULL OR meta.status = :approved)",
-        { approved: PhotoModerationStatus.APPROVED },
-      );
+      qb.andWhere("(meta.status IS NULL OR meta.status = :approved)", {
+        approved: PhotoModerationStatus.APPROVED,
+      });
     }
 
     return qb.getMany();
@@ -131,10 +130,9 @@ export class PhotosService {
       .leftJoinAndSelect("photo.meta", "meta")
       .where("photo.user_id = :userId", { userId })
       .andWhere("photo.is_primary = true")
-      .andWhere(
-        "(meta.status IS NULL OR meta.status = :approved)",
-        { approved: PhotoModerationStatus.APPROVED },
-      )
+      .andWhere("(meta.status IS NULL OR meta.status = :approved)", {
+        approved: PhotoModerationStatus.APPROVED,
+      })
       .orderBy("photo.created_at", "ASC")
       .getOne();
 

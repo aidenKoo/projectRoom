@@ -18,7 +18,11 @@ import { PhotoModerationService } from "./photo-moderation.service";
     TypeOrmModule.forFeature([Photo, PhotoMeta]),
     UsersModule,
   ],
-  controllers: [PhotosController, PhotoModerationWebhookController, PhotoStorageWebhookController],
+  controllers: [
+    PhotosController,
+    PhotoModerationWebhookController,
+    PhotoStorageWebhookController,
+  ],
   providers: [PhotosService, PhotoModerationService],
   exports: [PhotosService, PhotoModerationService],
 })

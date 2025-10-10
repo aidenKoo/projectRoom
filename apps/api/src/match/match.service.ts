@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from "@nestjs/common";
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  BadRequestException,
+} from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, LessThan } from "typeorm";
 import { Like } from "./entities/like.entity";
@@ -160,7 +165,6 @@ export class MatchService {
       const scoreResult = await this.scorerService.calculateScore(
         userId,
         candidate.user.firebase_uid,
-        token,
       );
 
       const rec = this.recommendationRepository.create({
@@ -210,20 +214,19 @@ export class MatchService {
   ): Promise<void> {
     const match = await this.findMatchById(matchId, userId);
 
-    const sanitizedAnswers = Object.entries(answers || {}).reduce<Record<string, string>>(
-      (acc, [key, value]) => {
-        if (typeof value === "string") {
-          const trimmed = value.trim();
-          if (trimmed.length > 0) {
-            acc[key] = trimmed.slice(0, 500);
-          }
-        } else if (value !== undefined && value !== null) {
-          acc[key] = String(value).slice(0, 500);
+    const sanitizedAnswers = Object.entries(answers || {}).reduce<
+      Record<string, string>
+    >((acc, [key, value]) => {
+      if (typeof value === "string") {
+        const trimmed = value.trim();
+        if (trimmed.length > 0) {
+          acc[key] = trimmed.slice(0, 500);
         }
-        return acc;
-      },
-      {},
-    );
+      } else if (value !== undefined && value !== null) {
+        acc[key] = String(value).slice(0, 500);
+      }
+      return acc;
+    }, {});
 
     if (Object.keys(sanitizedAnswers).length === 0) {
       throw new BadRequestException("답변이 비어 있습니다.");

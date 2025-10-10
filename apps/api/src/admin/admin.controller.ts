@@ -16,7 +16,10 @@ import { FirebaseAuthGuard } from "../common/guards/firebase-auth.guard";
 import { AdminGuard } from "../common/guards/admin.guard";
 import { AuditAction } from "../audit-logs/entities/audit-log.entity";
 import { extractRequestContext } from "../common/utils/request-context.util";
-import { ModeratePhotoDto, PhotoModerationDecision } from "./dto/moderate-photo.dto";
+import {
+  ModeratePhotoDto,
+  PhotoModerationDecision,
+} from "./dto/moderate-photo.dto";
 import { PhotoModerationStatus } from "../photos/entities/photo-meta.entity";
 const toDateOrThrow = (value: string, label: string): Date => {
   const date = new Date(value);
@@ -30,7 +33,15 @@ const startOfDay = (date: Date): Date =>
   new Date(date.getFullYear(), date.getMonth(), date.getDate());
 
 const endOfDay = (date: Date): Date =>
-  new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
+  new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate(),
+    23,
+    59,
+    59,
+    999,
+  );
 
 @Controller("admin")
 @UseGuards(FirebaseAuthGuard, AdminGuard)
@@ -128,8 +139,33 @@ export class AdminController {
 
   // 매칭 큐 모니터 (추천 디버깅)
   @Get("match/queue")
-  async getMatchQueue(@Query("userId") userId?: string) {
-    return this.adminService.getMatchQueue(userId);
+  async getMatchQueue(
+    @Query("userId") userId?: string,
+    @Query("targetUserId") targetUserId?: string,
+    @Query("minScore") minScoreParam?: string,
+    @Query("maxScore") maxScoreParam?: string,
+    @Query("dateFrom") dateFromParam?: string,
+    @Query("dateTo") dateToParam?: string,
+    @Query("page") pageParam?: string,
+    @Query("limit") limitParam?: string,
+  ) {
+    const minScore = minScoreParam ? parseFloat(minScoreParam) : undefined;
+    const maxScore = maxScoreParam ? parseFloat(maxScoreParam) : undefined;
+    const page = pageParam ? parseInt(pageParam, 10) : undefined;
+    const limit = limitParam ? parseInt(limitParam, 10) : undefined;
+    const dateFrom = dateFromParam ? new Date(dateFromParam) : undefined;
+    const dateTo = dateToParam ? new Date(dateToParam) : undefined;
+
+    return this.adminService.getMatchQueue({
+      userId,
+      targetUserId,
+      minScore,
+      maxScore,
+      dateFrom,
+      dateTo,
+      page,
+      limit,
+    });
   }
 
   @Get("moderation/photos")

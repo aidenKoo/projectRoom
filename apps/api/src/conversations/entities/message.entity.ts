@@ -22,7 +22,12 @@ export class Message {
   @JoinColumn({ name: "conversation_id" })
   conversation: Conversation;
 
-  @Column({ name: "sender_uid", type: "varchar", length: 64, comment: "sender user id" })
+  @Column({
+    name: "sender_uid",
+    type: "varchar",
+    length: 64,
+    comment: "sender user id",
+  })
   senderUid: string;
 
   @Column({ type: "text", comment: "메시지 본문" })

@@ -1,4 +1,3 @@
-import { Profile } from "../../profiles/entities/profile.entity";
 import {
   Column,
   CreateDateColumn,

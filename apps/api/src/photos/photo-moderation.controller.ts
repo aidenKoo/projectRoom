@@ -35,6 +35,7 @@ export class PhotoModerationWebhookController {
     await this.photoModerationService.handleAutoModerationResult(
       body.metaId,
       body.result,
+      body.hash,
     );
 
     return { ok: true };

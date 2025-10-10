@@ -1,16 +1,15 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Not, In } from 'typeorm';
-import { HttpService } from '@nestjs/axios';
-import { ConfigService } from '@nestjs/config';
-import { firstValueFrom } from 'rxjs';
-import { User } from '../users/entities/user.entity';
-import { Profile } from '../profiles/entities/profile.entity';
-import { Preference } from '../preferences/entities/preference.entity';
-import { Like } from './entities/like.entity';
-import { Match } from './entities/match.entity';
-import { Recommendation } from './entities/recommendation.entity';
-import { ProfilePrivate } from '../profiles-private/entities/profile-private.entity';
+import { Injectable, Logger } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { HttpService } from "@nestjs/axios";
+import { ConfigService } from "@nestjs/config";
+import { User } from "../users/entities/user.entity";
+import { Profile } from "../profiles/entities/profile.entity";
+import { Preference } from "../preferences/entities/preference.entity";
+import { Like } from "./entities/like.entity";
+import { Match } from "./entities/match.entity";
+import { Recommendation } from "./entities/recommendation.entity";
+import { ProfilePrivate } from "../profiles-private/entities/profile-private.entity";
 
 interface ScoreResult {
   totalScore: number;
@@ -43,7 +42,9 @@ export class MatchScorerService {
   ) {}
 
   async getCandidates(userId: string, limit = 100): Promise<Profile[]> {
-    const myUser = await this.userRepository.findOneBy({ firebase_uid: userId });
+    const myUser = await this.userRepository.findOneBy({
+      firebase_uid: userId,
+    });
     if (!myUser) return [];
 
     const myPreference = await this.preferenceRepository.findOneBy({
@@ -55,7 +56,7 @@ export class MatchScorerService {
     const likedUserIds = (
       await this.likeRepository.find({
         where: { fromUserId: myFirebaseUid },
-        select: ['toUserId'],
+        select: ["toUserId"],
       })
     ).map((l) => l.toUserId);
 
@@ -67,7 +68,7 @@ export class MatchScorerService {
     const skippedUserIds = (
       await this.recommendationRepository.find({
         where: { userId, isSkipped: true },
-        select: ['targetUserId'],
+        select: ["targetUserId"],
       })
     ).map((r) => r.targetUserId);
 
@@ -81,9 +82,9 @@ export class MatchScorerService {
     ];
 
     const query = this.profileRepository
-      .createQueryBuilder('profile')
-      .innerJoinAndSelect('profile.user', 'user')
-      .where('user.firebase_uid NOT IN (:...excludedUserIds)', {
+      .createQueryBuilder("profile")
+      .innerJoinAndSelect("profile.user", "user")
+      .where("user.firebase_uid NOT IN (:...excludedUserIds)", {
         excludedUserIds,
       });
 
@@ -91,10 +92,13 @@ export class MatchScorerService {
       if (myPreference.ageMin && myPreference.ageMax) {
         const maxBirthYear = new Date().getFullYear() - myPreference.ageMin;
         const minBirthYear = new Date().getFullYear() - myPreference.ageMax;
-        query.andWhere('user.birth_year BETWEEN :minBirthYear AND :maxBirthYear', {
-          minBirthYear,
-          maxBirthYear,
-        });
+        query.andWhere(
+          "user.birth_year BETWEEN :minBirthYear AND :maxBirthYear",
+          {
+            minBirthYear,
+            maxBirthYear,
+          },
+        );
       }
     }
 
@@ -104,7 +108,6 @@ export class MatchScorerService {
   async calculateScore(
     userId: string,
     targetUserId: string,
-    token?: string,
   ): Promise<ScoreResult> {
     const [myUser, targetUser] = await Promise.all([
       this.userRepository.findOneBy({ firebase_uid: userId }),
@@ -112,18 +115,29 @@ export class MatchScorerService {
     ]);
 
     if (!myUser || !targetUser) {
-      return { totalScore: 0, breakdown: {}, sharedBits: [], reason: '사용자 정보 없음' };
+      return {
+        totalScore: 0,
+        breakdown: {},
+        sharedBits: [],
+        reason: "사용자 정보 없음",
+      };
     }
 
-    const [myProfile, targetProfile, myPreference, targetProfilePrivate] = await Promise.all([
-      this.profileRepository.findOneBy({ user_id: myUser.id }),
-      this.profileRepository.findOneBy({ user_id: targetUser.id }),
-      this.preferenceRepository.findOneBy({ userId: myUser.id }),
-      this.profilePrivateRepository.findOneBy({ userId: targetUser.id }),
-    ]);
+    const [myProfile, targetProfile, myPreference, targetProfilePrivate] =
+      await Promise.all([
+        this.profileRepository.findOneBy({ user_id: myUser.id }),
+        this.profileRepository.findOneBy({ user_id: targetUser.id }),
+        this.preferenceRepository.findOneBy({ userId: myUser.id }),
+        this.profilePrivateRepository.findOneBy({ userId: targetUser.id }),
+      ]);
 
     if (!myProfile || !targetProfile || !myPreference) {
-      return { totalScore: 0, breakdown: {}, sharedBits: [], reason: '정보 부족' };
+      return {
+        totalScore: 0,
+        breakdown: {},
+        sharedBits: [],
+        reason: "정보 부족",
+      };
     }
 
     let totalScore = 0;
@@ -138,7 +152,7 @@ export class MatchScorerService {
         let similarity = 0;
 
         switch (item.type) {
-          case 'age_range':
+          case "age_range":
             const targetAge = new Date().getFullYear() - targetUser.birth_year;
             const { min: minAge, max: maxAge } = item.value;
             if (targetAge >= minAge && targetAge <= maxAge) {
@@ -150,51 +164,65 @@ export class MatchScorerService {
             // 선형 감쇠는 추후 구체적인 규칙에 따라 추가 가능
             break;
 
-          case 'height_cm_range':
+          case "height_cm_range":
             const targetHeight = targetProfile.height_cm;
             const { min: minHeight, max: maxHeight } = item.value;
             if (targetHeight >= minHeight && targetHeight <= maxHeight) {
               similarity = 1;
               sharedBits.push(`키 ${targetHeight}cm`);
-            } else if (targetHeight >= minHeight - 5 && targetHeight <= maxHeight + 5) {
+            } else if (
+              targetHeight >= minHeight - 5 &&
+              targetHeight <= maxHeight + 5
+            ) {
               // 키는 5cm 범위까지 유사도 부여
               similarity = 0.8;
             }
             break;
 
-          case 'religion':
-            if (Array.isArray(item.value) && item.value.includes(targetProfile.religion)) {
-                similarity = 1;
-                sharedBits.push(`종교: ${targetProfile.religion}`);
+          case "religion":
+            if (
+              Array.isArray(item.value) &&
+              item.value.includes(targetProfile.religion)
+            ) {
+              similarity = 1;
+              sharedBits.push(`종교: ${targetProfile.religion}`);
             }
             break;
 
-          case 'drink':
-            if (Array.isArray(item.value) && item.value.includes(targetProfile.drink)) {
-                similarity = 1;
+          case "drink":
+            if (
+              Array.isArray(item.value) &&
+              item.value.includes(targetProfile.drink)
+            ) {
+              similarity = 1;
             }
             break;
 
-          case 'smoke':
-            if (Array.isArray(item.value) && item.value.includes(targetProfile.smoke)) {
-                similarity = 1;
+          case "smoke":
+            if (
+              Array.isArray(item.value) &&
+              item.value.includes(targetProfile.smoke)
+            ) {
+              similarity = 1;
             }
             break;
 
-          case 'hobby_overlap':
+          case "hobby_overlap":
             const myHobbies = myProfile.hobbies || [];
             const targetHobbies = targetProfile.hobbies || [];
-            const intersection = myHobbies.filter(h => targetHobbies.includes(h));
+            const intersection = myHobbies.filter((h) =>
+              targetHobbies.includes(h),
+            );
             const union = [...new Set([...myHobbies, ...targetHobbies])];
             if (union.length > 0) {
               similarity = intersection.length / union.length; // Jaccard Similarity
             }
             if (intersection.length > 0) {
-              sharedBits.push(`공통 취미: ${intersection.join(', ')}`);
+              sharedBits.push(`공통 취미: ${intersection.join(", ")}`);
             }
             break;
 
-          case 'region':
+          case "region":
             const preferredRegions = item.value as string[];
             if (preferredRegions.includes(targetUser.region_code)) {
               similarity = 1.0;
@@ -204,7 +232,7 @@ export class MatchScorerService {
             }
             break;
 
-          case 'mbti':
+          case "mbti":
             const preferredMbtis = item.value as string[];
             const targetMbti = (targetProfile.mbti || [])[0]; // 대상은 첫번째 MBTI만 고려
             if (targetMbti && preferredMbtis.length > 0) {
@@ -216,13 +244,16 @@ export class MatchScorerService {
                     matchingLetters++;
                   }
                 }
-                maxMbtiScore = Math.max(maxMbtiScore, (matchingLetters / 4) * 0.8 + 0.2);
+                maxMbtiScore = Math.max(
+                  maxMbtiScore,
+                  (matchingLetters / 4) * 0.8 + 0.2,
+                );
               }
               similarity = maxMbtiScore;
             }
             break;
 
-          case 'job_group':
+          case "job_group":
             const preferredJobs = item.value as string[];
             if (preferredJobs.includes(targetProfile.job_group)) {
               similarity = 1.0;
@@ -230,7 +261,7 @@ export class MatchScorerService {
             }
             break;
 
-          case 'edu_level':
+          case "edu_level":
             const preferredEdus = item.value as string[];
             if (preferredEdus.includes(targetProfile.edu_level)) {
               similarity = 1.0;
@@ -258,10 +289,14 @@ export class MatchScorerService {
     }
 
     // Information Penalty
-    const penaltyFields = ['job_group', 'edu_level', 'hobbies', 'mbti'];
+    const penaltyFields = ["job_group", "edu_level", "hobbies", "mbti"];
     let penaltyCount = 0;
     for (const field of penaltyFields) {
-      if (!targetProfile[field] || (Array.isArray(targetProfile[field]) && targetProfile[field].length === 0)) {
+      if (
+        !targetProfile[field] ||
+        (Array.isArray(targetProfile[field]) &&
+          targetProfile[field].length === 0)
+      ) {
         penaltyCount++;
       }
     }
@@ -270,10 +305,10 @@ export class MatchScorerService {
       totalScore *= penaltyMultiplier;
       breakdown.informationPenalty = { penaltyCount, penaltyMultiplier };
     }
-    
-    let reason = '추천 프로필';
+
+    let reason = "추천 프로필";
     if (sharedBits.length > 0) {
-      reason = sharedBits.slice(0, 2).join(' · ');
+      reason = sharedBits.slice(0, 2).join(" · ");
     }
 
     return {

@@ -29,6 +29,24 @@ const parseDateOrThrow = (value: string, label: string): Date => {
 export class StatisticsController {
   constructor(private readonly statisticsService: StatisticsService) {}
 
+  @Get("overview")
+  @ApiOperation({ summary: "Get aggregated statistics" })
+  @ApiQuery({ name: "startDate", required: true, example: "2025-10-01" })
+  @ApiQuery({ name: "endDate", required: true, example: "2025-10-31" })
+  async getOverview(
+    @Query("startDate") startDate: string,
+    @Query("endDate") endDate: string,
+  ) {
+    const start = parseDateOrThrow(startDate, "startDate");
+    const end = parseDateOrThrow(endDate, "endDate");
+
+    if (start > end) {
+      throw new BadRequestException("startDate cannot be after endDate");
+    }
+
+    return this.statisticsService.getOverview(start, end);
+  }
+
   @Get()
   @ApiOperation({ summary: "Get statistics for a date range" })
   @ApiQuery({ name: "startDate", required: true, example: "2025-10-01" })
@@ -45,5 +63,11 @@ export class StatisticsController {
     }
 
     return this.statisticsService.getStatistics(startDate, endDate);
+  }
+
+  @Get("experiments")
+  @ApiOperation({ summary: "Get experiment statistics summary" })
+  async getExperimentStats() {
+    return this.statisticsService.getExperimentStats();
   }
 }

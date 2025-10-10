@@ -221,10 +221,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     return { success: true };
   }
 
-  private transformPayload<T>(
-    cls: new () => T,
-    payload: unknown,
-  ): T {
+  private transformPayload<T>(cls: new () => T, payload: unknown): T {
     const instance = plainToInstance(cls, payload);
     const errors = validateSync(instance as object, {
       whitelist: true,
@@ -252,7 +249,9 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     entry.count += 1;
     if (entry.count > ChatGateway.MESSAGE_WINDOW_MAX) {
-      throw new WsException("Too many messages in a short period. Please slow down.");
+      throw new WsException(
+        "Too many messages in a short period. Please slow down.",
+      );
     }
   }
 

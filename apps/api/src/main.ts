@@ -4,11 +4,26 @@ import { SwaggerModule, DocumentBuilder } from "@nestjs/swagger";
 import { ConfigService } from "@nestjs/config";
 import { AppModule } from "./app.module";
 import { SanitizeInterceptor } from "./common/interceptors/sanitize.interceptor";
+import { TracingInterceptor } from "./common/telemetry/tracing.interceptor";
+import { MetricsInterceptor } from "./common/telemetry/metrics.interceptor";
+import { MetricsService } from "./common/telemetry/metrics.service";
 import { initializeFirebase } from "./common/config/firebase.config";
+import { initializeTracing } from "./common/telemetry/tracing";
+
+// Initialize OpenTelemetry before app starts
+if (process.env.OTEL_ENABLED === "true") {
+  initializeTracing();
+}
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.useGlobalInterceptors(new SanitizeInterceptor());
+
+  if (process.env.OTEL_ENABLED === "true") {
+    app.useGlobalInterceptors(new TracingInterceptor());
+    const metricsService = app.get(MetricsService);
+    app.useGlobalInterceptors(new MetricsInterceptor(metricsService));
+  }
 
   // Initialize Firebase Admin
   const configService = app.get(ConfigService);

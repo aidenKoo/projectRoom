@@ -183,26 +183,26 @@ export class AdminService {
     });
 
     if (existing) {
-    if (auditContext) {
-      await this.auditLogsService.createLog({
-        accessorId: auditContext.accessorId,
-        targetUserId: auditContext.accessorId,
-        action: auditContext.action,
-        reason: auditContext.reason,
-        targetResource: "admin.codes.generate",
-        ip: auditContext.ip,
-        requestId: auditContext.requestId,
-        details: {
-          code: existing.code,
-          month:
-            existing.month instanceof Date
-              ? existing.month.toISOString()
-              : existing.month,
-          alreadyExists: true,
-          userAgent: auditContext.userAgent,
-        },
-      });
-    }
+      if (auditContext) {
+        await this.auditLogsService.createLog({
+          accessorId: auditContext.accessorId,
+          targetUserId: auditContext.accessorId,
+          action: auditContext.action,
+          reason: auditContext.reason,
+          targetResource: "admin.codes.generate",
+          ip: auditContext.ip,
+          requestId: auditContext.requestId,
+          details: {
+            code: existing.code,
+            month:
+              existing.month instanceof Date
+                ? existing.month.toISOString()
+                : existing.month,
+            alreadyExists: true,
+            userAgent: auditContext.userAgent,
+          },
+        });
+      }
       return existing;
     }
 
@@ -257,17 +257,62 @@ export class AdminService {
   }
 
   // 매칭 큐 모니터
-  async getMatchQueue(userId?: string) {
+  async getMatchQueue(options: {
+    userId?: string;
+    targetUserId?: string;
+    minScore?: number;
+    maxScore?: number;
+    dateFrom?: Date;
+    dateTo?: Date;
+    page?: number;
+    limit?: number;
+  } = {}) {
+    const {
+      userId,
+      targetUserId,
+      minScore,
+      maxScore,
+      dateFrom,
+      dateTo,
+      page = 1,
+      limit = 50,
+    } = options;
+
+    const safePage = Math.max(1, page);
+    const safeLimit = Math.min(Math.max(limit, 1), 100);
+
     const query = this.recommendationRepository
       .createQueryBuilder("rec")
-      .orderBy("rec.score", "DESC")
-      .take(50);
+      .orderBy("rec.score", "DESC");
 
     if (userId) {
-      query.where("rec.userId = :userId", { userId });
+      query.andWhere("rec.userId = :userId", { userId });
     }
 
-    const recommendations = await query.getMany();
+    if (targetUserId) {
+      query.andWhere("rec.targetUserId = :targetUserId", { targetUserId });
+    }
+
+    if (minScore !== undefined) {
+      query.andWhere("rec.score >= :minScore", { minScore });
+    }
+
+    if (maxScore !== undefined) {
+      query.andWhere("rec.score <= :maxScore", { maxScore });
+    }
+
+    if (dateFrom) {
+      query.andWhere("rec.created_at >= :dateFrom", { dateFrom });
+    }
+
+    if (dateTo) {
+      query.andWhere("rec.created_at <= :dateTo", { dateTo });
+    }
+
+    const [recommendations, total] = await query
+      .skip((safePage - 1) * safeLimit)
+      .take(safeLimit)
+      .getManyAndCount();
     const now = new Date();
 
     const allRelevantUserIds = new Set<string>();
@@ -332,8 +377,8 @@ export class AdminService {
       const status = rec.isSkipped
         ? "skipped"
         : rec.isShown
-        ? "shown"
-        : "queued";
+          ? "shown"
+          : "queued";
 
       const waitMinutes =
         rec.isShown && rec.shownAt
@@ -342,9 +387,7 @@ export class AdminService {
 
       waitTimes.push(waitMinutes);
       const numericScore =
-        typeof rec.score === "number"
-          ? rec.score
-          : Number(rec.score ?? 0);
+        typeof rec.score === "number" ? rec.score : Number(rec.score ?? 0);
       const safeScore = Number.isFinite(numericScore) ? numericScore : 0;
       scoreSum += safeScore;
 
@@ -393,7 +436,10 @@ export class AdminService {
     const p95Index =
       sortedWaits.length === 0
         ? -1
-        : Math.min(sortedWaits.length - 1, Math.floor(sortedWaits.length * 0.95));
+        : Math.min(
+            sortedWaits.length - 1,
+            Math.floor(sortedWaits.length * 0.95),
+          );
     const p95WaitMinutes = p95Index >= 0 ? sortedWaits[p95Index] : 0;
 
     const ownerUser = userId ? usersByUid.get(userId) : undefined;
@@ -420,6 +466,7 @@ export class AdminService {
       owner: ownerSummary,
       stats: {
         total: totalCount,
+        totalInDb: total,
         queued: queuedCount,
         shown: shownCount,
         skipped: skippedCount,
@@ -428,9 +475,20 @@ export class AdminService {
         p95WaitMinutes,
       },
       recommendations: formatted,
+      pagination: {
+        page: safePage,
+        limit: safeLimit,
+        total,
+        totalPages: Math.ceil(total / safeLimit),
+      },
       retrievedAt: now.toISOString(),
       filter: {
         userId: userId ?? null,
+        targetUserId: targetUserId ?? null,
+        minScore: minScore ?? null,
+        maxScore: maxScore ?? null,
+        dateFrom: dateFrom?.toISOString() ?? null,
+        dateTo: dateTo?.toISOString() ?? null,
         limit: 50,
       },
     };
@@ -539,14 +597,14 @@ export class AdminService {
       },
     });
 
-    return this.serializePhotoMeta(updated, ownerUser ?? undefined, ownerProfile ?? undefined);
+    return this.serializePhotoMeta(
+      updated,
+      ownerUser ?? undefined,
+      ownerProfile ?? undefined,
+    );
   }
 
-  private serializePhotoMeta(
-    meta: PhotoMeta,
-    user?: User,
-    profile?: Profile,
-  ) {
+  private serializePhotoMeta(meta: PhotoMeta, user?: User, profile?: Profile) {
     const photo = meta.photo;
     const createdAt = photo?.createdAt ?? meta.createdAt;
 

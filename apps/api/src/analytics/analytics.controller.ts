@@ -1,10 +1,10 @@
+import { Controller, Get, Query, ParseIntPipe } from "@nestjs/common";
 import {
-  Controller,
-  Get,
-  Query,
-  ParseIntPipe,
-} from "@nestjs/common";
-import { AnalyticsService, DailyStats, MatchingStats, MessagingStats } from "./analytics.service";
+  AnalyticsService,
+  DailyStats,
+  MatchingStats,
+  MessagingStats,
+} from "./analytics.service";
 
 @Controller("analytics")
 // @UseGuards(FirebaseAuthGuard, AdminGuard)

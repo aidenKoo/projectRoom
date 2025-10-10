@@ -6,9 +6,9 @@ import {
 } from "typeorm";
 
 export enum AuditAction {
-  READ_PRIVATE_PROFILE = 'READ_PRIVATE_PROFILE',
-  UPDATE_SENSITIVE_DATA = 'UPDATE_SENSITIVE_DATA',
-  DELETE_USER = 'DELETE_USER',
+  READ_PRIVATE_PROFILE = "READ_PRIVATE_PROFILE",
+  UPDATE_SENSITIVE_DATA = "UPDATE_SENSITIVE_DATA",
+  DELETE_USER = "DELETE_USER",
   // ... other actions
 }
 
@@ -26,7 +26,7 @@ export class AuditLog {
   @Column()
   targetUserId: string; // The ID of the user whose data is being accessed
 
-  @Column({type: 'enum', enum: AuditAction})
+  @Column({ type: "enum", enum: AuditAction })
   action: AuditAction; // e.g., 'READ_PRIVATE_PROFILE', 'UPDATE_SENSITIVE_DATA'
 
   @Column({ type: "json", nullable: true })

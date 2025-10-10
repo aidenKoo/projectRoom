@@ -8,9 +8,7 @@ interface RequestContext {
 
 export const extractRequestContext = (req: Request): RequestContext => {
   const forwardedFor = req.headers["x-forwarded-for"] as string | undefined;
-  const rawIp = forwardedFor
-    ? forwardedFor.split(",")[0]?.trim()
-    : req.ip;
+  const rawIp = forwardedFor ? forwardedFor.split(",")[0]?.trim() : req.ip;
 
   const requestId = (req.headers["x-request-id"] as string | undefined)?.trim();
   const userAgent = (req.headers["user-agent"] as string | undefined)?.trim();

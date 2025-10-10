@@ -1,18 +1,29 @@
-import { Controller, Get, Post, Body, Param, UseGuards, Query, ParseIntPipe, Req, NotFoundException } from "@nestjs/common";
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  UseGuards,
+  Query,
+  ParseIntPipe,
+  Req,
+  NotFoundException,
+} from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { MatchService } from "./match.service";
-import { FirebaseAuthGuard } from '../common/guards/firebase-auth.guard';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from "@nestjs/swagger";
-import { CreateLikeDto } from './dto/create-like.dto';
-import { SkipRecommendationDto } from './dto/skip-recommendation.dto';
-import { User } from '../users/entities/user.entity';
-import { RateLimit } from '../common/decorators/rate-limit.decorator';
+import { FirebaseAuthGuard } from "../common/guards/firebase-auth.guard";
+import { ApiTags, ApiOperation, ApiBearerAuth } from "@nestjs/swagger";
+import { CreateLikeDto } from "./dto/create-like.dto";
+import { SkipRecommendationDto } from "./dto/skip-recommendation.dto";
+import { User } from "../users/entities/user.entity";
+import { RateLimit } from "../common/decorators/rate-limit.decorator";
 
-@ApiTags('match')
-@Controller('v1/match')
+@ApiTags("match")
+@Controller("v1/match")
 @UseGuards(FirebaseAuthGuard)
-@ApiBearerAuth('firebase')
+@ApiBearerAuth("firebase")
 export class MatchController {
   constructor(
     private readonly matchService: MatchService,
@@ -20,41 +31,46 @@ export class MatchController {
     private readonly userRepository: Repository<User>,
   ) {}
 
-  @Get('recommendations')
+  @Get("recommendations")
   @RateLimit(60, 60)
-  @ApiOperation({ summary: 'Get user recommendations' })
+  @ApiOperation({ summary: "Get user recommendations" })
   async getRecommendations(
     @Req() req: any,
-    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
+    @Query("limit", new ParseIntPipe({ optional: true })) limit?: number,
   ) {
     const userId = req.user.uid;
-    const token = req.headers.authorization?.split(' ')[1];
+    const token = req.headers.authorization?.split(" ")[1];
     return this.matchService.getRecommendations(userId, token, limit || 9);
   }
 
-  @Post('like')
+  @Post("like")
   @RateLimit(30, 60)
-  @ApiOperation({ summary: 'Like a user and check for a mutual match' })
+  @ApiOperation({ summary: "Like a user and check for a mutual match" })
   async createLike(@Req() req: any, @Body() createLikeDto: CreateLikeDto) {
     const firebaseUid = req.user.uid;
-    const user = await this.userRepository.findOne({ where: { firebase_uid: firebaseUid } });
+    const user = await this.userRepository.findOne({
+      where: { firebase_uid: firebaseUid },
+    });
     if (!user) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundException("User not found");
     }
 
     const targetUser = await this.userRepository.findOne({
       where: { firebase_uid: createLikeDto.targetUserId },
     });
     if (!targetUser) {
-      throw new NotFoundException('Target user not found');
+      throw new NotFoundException("Target user not found");
     }
 
-    return this.matchService.createLike(user.firebase_uid, targetUser.firebase_uid);
+    return this.matchService.createLike(
+      user.firebase_uid,
+      targetUser.firebase_uid,
+    );
   }
 
-  @Post('skip')
+  @Post("skip")
   @RateLimit(30, 60)
-  @ApiOperation({ summary: 'Skip a recommended user' })
+  @ApiOperation({ summary: "Skip a recommended user" })
   async skipRecommendation(
     @Req() req: any,
     @Body() skipDto: SkipRecommendationDto,
@@ -64,29 +80,31 @@ export class MatchController {
     return { ok: true };
   }
 
-  @Get('mutuals')
-  @ApiOperation({ summary: 'Get my mutual matches' })
+  @Get("mutuals")
+  @ApiOperation({ summary: "Get my mutual matches" })
   async getMyMatches(@Req() req: any) {
     const userId = req.user.uid;
     return this.matchService.getMyMatches(userId);
   }
 
-  @Get('likes-received')
-  @ApiOperation({ summary: 'Get users who liked me' })
+  @Get("likes-received")
+  @ApiOperation({ summary: "Get users who liked me" })
   async getLikesReceived(@Req() req: any) {
     const firebaseUid = req.user.uid;
-    const user = await this.userRepository.findOne({ where: { firebase_uid: firebaseUid } });
+    const user = await this.userRepository.findOne({
+      where: { firebase_uid: firebaseUid },
+    });
     if (!user) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundException("User not found");
     }
     return this.matchService.getLikesReceived(user.firebase_uid);
   }
 
-  @Post(':matchId/initial-answers')
-  @ApiOperation({ summary: 'Save the initial 3-questions-3-answers' })
+  @Post(":matchId/initial-answers")
+  @ApiOperation({ summary: "Save the initial 3-questions-3-answers" })
   async saveInitialAnswers(
     @Req() req: any,
-    @Param('matchId') matchId: string,
+    @Param("matchId") matchId: string,
     @Body() answers: Record<string, string>,
   ) {
     const userId = req.user.uid;

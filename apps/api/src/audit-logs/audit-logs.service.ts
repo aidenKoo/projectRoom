@@ -134,7 +134,10 @@ export class AuditLogsService {
     end: Date,
   ): Promise<{
     range: { start: string; end: string };
-    daily: Array<{ date: string; counts: Partial<Record<AuditAction, number>> }>;
+    daily: Array<{
+      date: string;
+      counts: Partial<Record<AuditAction, number>>;
+    }>;
     totals: Partial<Record<AuditAction, number>>;
     totalEvents: number;
   }> {

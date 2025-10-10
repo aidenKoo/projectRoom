@@ -64,7 +64,10 @@ export class MessagesController {
       throw new BadRequestException("Text messages must include a body.");
     }
 
-    if (createMessageDto.type === "image" && !createMessageDto.imageUrl?.trim()) {
+    if (
+      createMessageDto.type === "image" &&
+      !createMessageDto.imageUrl?.trim()
+    ) {
       throw new BadRequestException("Image messages require an imageUrl.");
     }
 

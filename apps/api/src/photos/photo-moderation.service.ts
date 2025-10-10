@@ -5,10 +5,7 @@ import { ConfigService } from "@nestjs/config";
 import { Repository } from "typeorm";
 import { firstValueFrom } from "rxjs";
 import { Photo } from "./entities/photo.entity";
-import {
-  PhotoMeta,
-  PhotoModerationStatus,
-} from "./entities/photo-meta.entity";
+import { PhotoMeta, PhotoModerationStatus } from "./entities/photo-meta.entity";
 
 interface ModerationPayload {
   width?: number;
@@ -74,6 +71,18 @@ export class PhotoModerationService {
     return meta;
   }
 
+  async findDuplicateByHash(
+    userId: number,
+    hash: string,
+  ): Promise<PhotoMeta | null> {
+    if (!hash) return null;
+
+    return this.photoMetaRepository.findOne({
+      where: { userId, hash },
+      relations: { photo: true },
+    });
+  }
+
   async getMetaByPhotoId(photoId: number): Promise<PhotoMeta | null> {
     return this.photoMetaRepository.findOne({
       where: { photoId },
@@ -92,9 +101,12 @@ export class PhotoModerationService {
     return this.photoMetaRepository.save(meta);
   }
 
-  async getModerationQueue(
-    options: ModerationQueueOptions = {},
-  ): Promise<{ items: PhotoMeta[]; total: number; page: number; limit: number }> {
+  async getModerationQueue(options: ModerationQueueOptions = {}): Promise<{
+    items: PhotoMeta[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
     const {
       statuses = [
         PhotoModerationStatus.PENDING,
@@ -230,6 +242,7 @@ export class PhotoModerationService {
   async handleAutoModerationResult(
     metaId: number,
     result: ModerationDecision,
+    hash?: string,
   ): Promise<PhotoMeta> {
     const meta = await this.getMetaById(metaId);
     if (!meta) {
@@ -241,6 +254,12 @@ export class PhotoModerationService {
       typeof result.confidence === "number" ? result.confidence : null;
     meta.labels = result.reasons ?? null;
     meta.reviewNotes = null;
+
+    // Update hash if provided from Cloud Function
+    if (hash && !meta.hash) {
+      meta.hash = hash;
+      this.logger.log(`Updated hash for photo ${meta.photoId}: ${hash}`);
+    }
 
     if (result.flagged) {
       return this.markAutoFlagged(

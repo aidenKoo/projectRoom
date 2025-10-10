@@ -3,7 +3,6 @@ import {
   IsArray,
   IsBoolean,
   IsIn,
-  IsNotEmpty,
   IsNumber,
   IsOptional,
   IsString,
@@ -38,6 +37,10 @@ export class ModerationWebhookDto {
 
   @IsNumber()
   userId: number;
+
+  @IsOptional()
+  @IsString()
+  hash?: string;
 
   @IsOptional()
   @IsIn([

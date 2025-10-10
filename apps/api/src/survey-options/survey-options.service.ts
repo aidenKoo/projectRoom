@@ -135,7 +135,10 @@ export class SurveyOptionsService {
     }
   }
 
-  async toggleActive(id: number, auditContext?: AuditContext): Promise<SurveyOption> {
+  async toggleActive(
+    id: number,
+    auditContext?: AuditContext,
+  ): Promise<SurveyOption> {
     const option = await this.findOne(id);
     option.isActive = !option.isActive;
     const saved = await this.surveyOptionRepository.save(option);

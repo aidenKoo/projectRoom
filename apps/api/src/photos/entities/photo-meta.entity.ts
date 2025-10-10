@@ -20,6 +20,7 @@ export enum PhotoModerationStatus {
 @Entity("photo_meta")
 @Index(["userId", "status"])
 @Index("uniq_user_path", ["userId", "path"], { unique: true })
+@Index("idx_hash", ["hash"])
 export class PhotoMeta {
   @PrimaryGeneratedColumn({ type: "bigint", unsigned: true })
   id: number;

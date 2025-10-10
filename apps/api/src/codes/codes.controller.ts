@@ -1,4 +1,12 @@
-import { Controller, Get, Post, Body, Param, HttpCode, Query } from "@nestjs/common";
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  HttpCode,
+  Query,
+} from "@nestjs/common";
 import { CodesService } from "./codes.service";
 import { ApiTags, ApiOperation, ApiResponse } from "@nestjs/swagger";
 

@@ -24,6 +24,7 @@ import { StorageModule } from "./storage/storage.module";
 import { AuditLogsModule } from "./audit-logs/audit-logs.module";
 import { AnalyticsModule } from "./analytics/analytics.module";
 import { WebsocketModule } from "./websocket/websocket.module";
+import { TelemetryModule } from "./common/telemetry/telemetry.module";
 
 import { StatisticsModule } from "./statistics/statistics.module";
 import { RateLimitInterceptor } from "./common/interceptors/rate-limit.interceptor";
@@ -36,6 +37,7 @@ import { RedisService } from "./common/cache/redis.service";
     AuditLogsModule,
     AnalyticsModule,
     WebsocketModule,
+    TelemetryModule,
     ConfigModule.forRoot({
       isGlobal: true,
     }),

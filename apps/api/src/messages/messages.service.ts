@@ -1,4 +1,8 @@
-import { Injectable, ForbiddenException, BadRequestException } from "@nestjs/common";
+import {
+  Injectable,
+  ForbiddenException,
+  BadRequestException,
+} from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { Message } from "./entities/message.entity";
@@ -38,7 +42,7 @@ export class MessagesService {
       sender_id: senderId,
       body: type === "text" ? body.trim() : null,
       type,
-      image_url: type === "image" ? imageUrl ?? null : null,
+      image_url: type === "image" ? (imageUrl ?? null) : null,
     });
 
     return this.messagesRepository.save(message);

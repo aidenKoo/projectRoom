@@ -58,12 +58,13 @@ export class PhotoStorageWebhookController {
     const parsedHeight = metadata.height ? Number(metadata.height) : undefined;
     const parsedBytes = metadata.bytes ? Number(metadata.bytes) : undefined;
 
-    const meta = photo.meta ??
+    const meta =
+      photo.meta ??
       (await this.photoModerationService.upsertMeta(photo.userId, photo, {
         width: parsedWidth ?? photo.width ?? undefined,
         height: parsedHeight ?? photo.height ?? undefined,
         bytes: parsedBytes ?? photo.bytes ?? undefined,
-        hash: metadata.hash ?? photo.meta?.hash,
+        hash: metadata.hash,
         source: "storage_webhook",
       }));
 
