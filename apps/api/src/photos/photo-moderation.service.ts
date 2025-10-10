@@ -206,7 +206,7 @@ export class PhotoModerationService {
             photoId: meta.photoId,
             userId: meta.userId,
             publicUrl,
-            type: "photo_url",
+            type: "photo_caption",
           },
           {
             timeout: 15000,
