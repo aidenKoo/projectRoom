@@ -3,6 +3,7 @@ import { TypeOrmModule } from "@nestjs/typeorm";
 import { HttpModule } from "@nestjs/axios";
 import { ConfigModule } from "@nestjs/config";
 import { PhotosController } from "./photos.controller";
+import { PhotoModerationWebhookController } from "./photo-moderation.controller";
 import { PhotosService } from "./photos.service";
 import { Photo } from "./entities/photo.entity";
 import { PhotoMeta } from "./entities/photo-meta.entity";
@@ -16,7 +17,7 @@ import { PhotoModerationService } from "./photo-moderation.service";
     TypeOrmModule.forFeature([Photo, PhotoMeta]),
     UsersModule,
   ],
-  controllers: [PhotosController],
+  controllers: [PhotosController, PhotoModerationWebhookController],
   providers: [PhotosService, PhotoModerationService],
   exports: [PhotosService, PhotoModerationService],
 })

@@ -27,15 +27,16 @@
 
 ## 3. Outstanding Gaps / Next Steps
 1. **Supabase Trigger Flow**
-   - Wire Firebase Storage event → Supabase function that calls backend webhook (currently backend calls Supabase function directly; spec wants Cloud Function ingestion).
-   - Persist `photo_meta.hash` from Cloud Function if available.
+   - ✅ Edge Function이 백엔드 Webhook으로 결과를 전달하도록 전환(2025-10-12 완료).
+   - [ ] Firebase Storage 이벤트 → Edge Function 호출 전환(현재는 백엔드에서 직접 트리거).
+   - [ ] Cloud Function 제공 해시/메타데이터 수집 후 `photo_meta.hash` 저장.
 2. **NSFW Auto Flow**
    - Replace placeholder `type: "photo_caption"` payload with actual binary-safe moderation function (pass signed URL or base64).
    - Store moderation confidence curve and raw labels in a dedicated JSON schema (`{ provider, label, score }`).
 3. **Admin UI Enhancements**
-   - Batch actions (approve/reject multiple).
-   - Filter by user email/uid, date range.
-   - Display audit trail (fetch from `audit_logs`).
+   - ✅ 상태·검색·날짜 필터 및 페이지네이션 추가(2025-10-12 완료).
+   - [ ] Batch actions (approve/reject multiple).
+   - [ ] Display audit trail (fetch from `audit_logs`).
 4. **Client UX**
    - Polling / subscriptions for moderation status changes (currently manual refresh).
    - Add tooltip explaining each status, highlight rejected items requiring replacement.

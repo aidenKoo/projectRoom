@@ -1,8 +1,7 @@
 // Edge Function: Content Moderator
-// Moderates messages and profile content using Claude
+// Moderates photos via Claude and notifies backend webhook
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { moderateContent } from "../_shared/anthropic.ts";
 
 const corsHeaders = {
@@ -11,57 +10,57 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+const WEBHOOK_URL = Deno.env.get("PHOTO_MODERATION_WEBHOOK_URL") ?? "";
+const WEBHOOK_SECRET = Deno.env.get("PHOTO_MODERATION_WEBHOOK_SECRET") ?? "";
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
   try {
-    const { content, type } = await req.json();
+    const { publicUrl, metaId, photoId, userId, type } = await req.json();
 
-    if (!content || !type) {
-      throw new Error("Missing content or type");
+    if (!publicUrl || !metaId || !photoId || !userId) {
+      throw new Error("Missing required moderation payload fields");
     }
 
-    // Moderate content with Claude
-    const result = await moderateContent(content, type);
+    const moderation = await moderateContent(
+      publicUrl,
+      (type as "profile" | "message" | "photo_caption") ?? "photo_caption",
+    );
 
-    // If flagged with high severity, take immediate action
-    if (result.flagged && result.severity === "high") {
-      const supabaseClient = createClient(
-        Deno.env.get("SUPABASE_URL") ?? "",
-        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+    if (!WEBHOOK_URL || !WEBHOOK_SECRET) {
+      throw new Error("PHOTO_MODERATION webhook configuration is missing");
+    }
+
+    const webhookResponse = await fetch(WEBHOOK_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-webhook-secret": WEBHOOK_SECRET,
+      },
+      body: JSON.stringify({
+        metaId,
+        photoId,
+        userId,
+        result: moderation,
+      }),
+    });
+
+    if (!webhookResponse.ok) {
+      const text = await webhookResponse.text();
+      throw new Error(
+        `Backend webhook responded with ${webhookResponse.status}: ${text}`,
       );
-
-      const authHeader = req.headers.get("Authorization");
-      if (authHeader) {
-        const token = authHeader.replace("Bearer ", "");
-        const {
-          data: { user },
-        } = await supabaseClient.auth.getUser(token);
-
-        if (user) {
-          // Update risk score
-          await supabaseClient
-            .from("risk_scores")
-            .upsert({
-              user_id: user.id,
-              score: 75, // High risk
-              factors: {
-                content_moderation: result.reasons,
-                timestamp: new Date().toISOString(),
-              },
-            });
-        }
-      }
     }
 
-    return new Response(JSON.stringify(result), {
+    return new Response(JSON.stringify({ ok: true }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     });
   } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ error: String(error?.message ?? error) }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 400,
     });

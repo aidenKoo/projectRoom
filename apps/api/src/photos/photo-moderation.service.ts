@@ -1,4 +1,4 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { HttpService } from "@nestjs/axios";
 import { ConfigService } from "@nestjs/config";
@@ -198,12 +198,15 @@ export class PhotoModerationService {
     }
 
     try {
-      const response = await firstValueFrom(
-        this.httpService.post<ModerationDecision>(
+      await firstValueFrom(
+        this.httpService.post(
           url,
           {
-            content: publicUrl,
-            type: "photo_caption",
+            metaId: meta.id,
+            photoId: meta.photoId,
+            userId: meta.userId,
+            publicUrl,
+            type: "photo_url",
           },
           {
             timeout: 15000,
@@ -216,25 +219,6 @@ export class PhotoModerationService {
           },
         ),
       );
-
-      const result = response.data;
-      meta.nsfw = Boolean(result.flagged);
-      meta.nsfwScore =
-        typeof result.confidence === "number" ? result.confidence : null;
-      meta.labels = result.reasons ?? null;
-
-      if (result.flagged) {
-        await this.markAutoFlagged(
-          meta,
-          meta.nsfwScore ?? undefined,
-          meta.labels ?? undefined,
-          result.reasons,
-        );
-        return;
-      }
-
-      meta.status = PhotoModerationStatus.APPROVED;
-      await this.photoMetaRepository.save(meta);
     } catch (error: any) {
       this.logger.warn(
         `Content moderation request failed for photo ${meta.photoId}: ${error.message}`,
@@ -244,5 +228,33 @@ export class PhotoModerationService {
         await this.photoMetaRepository.save(meta);
       }
     }
+  }
+
+  async handleAutoModerationResult(
+    metaId: number,
+    result: ModerationDecision,
+  ): Promise<PhotoMeta> {
+    const meta = await this.getMetaById(metaId);
+    if (!meta) {
+      throw new NotFoundException("Photo moderation record not found");
+    }
+
+    meta.nsfw = Boolean(result.flagged);
+    meta.nsfwScore =
+      typeof result.confidence === "number" ? result.confidence : null;
+    meta.labels = result.reasons ?? null;
+    meta.reviewNotes = null;
+
+    if (result.flagged) {
+      return this.markAutoFlagged(
+        meta,
+        meta.nsfwScore ?? undefined,
+        meta.labels ?? undefined,
+        result.reasons,
+      );
+    }
+
+    meta.status = PhotoModerationStatus.APPROVED;
+    return this.photoMetaRepository.save(meta);
   }
 }
