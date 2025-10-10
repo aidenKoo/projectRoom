@@ -71,13 +71,6 @@ export class PhotoModerationService {
 
     meta = await this.photoMetaRepository.save(meta);
 
-    // Fire-and-forget auto moderation
-    this.triggerAutoModeration(meta, photo.publicUrl).catch((error) => {
-      this.logger.warn(
-        `Auto moderation failed for photo ${photo.id}: ${error.message}`,
-      );
-    });
-
     return meta;
   }
 
@@ -183,7 +176,7 @@ export class PhotoModerationService {
     return this.photoMetaRepository.save(meta);
   }
 
-  private async triggerAutoModeration(
+  async requestAutoModeration(
     meta: PhotoMeta,
     publicUrl: string,
   ): Promise<void> {
