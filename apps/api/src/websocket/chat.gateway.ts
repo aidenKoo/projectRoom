@@ -12,6 +12,13 @@ import { Logger } from "@nestjs/common";
 import * as admin from "firebase-admin";
 import { ConversationsService } from "../conversations/conversations.service";
 import { CreateMessageDto } from "../conversations/dto/create-message.dto";
+import { plainToInstance } from "class-transformer";
+import { validateSync } from "class-validator";
+import { WsException } from "@nestjs/websockets";
+import {
+  ConversationPayload,
+  SendMessagePayload,
+} from "./dto/send-message.payload";
 
 interface AuthenticatedSocket extends Socket {
   userId?: string;
@@ -29,6 +36,11 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   private readonly logger = new Logger(ChatGateway.name);
   private onlineUsers: Map<string, string> = new Map(); // userId -> socketId
+  private messageThrottle: Map<string, { windowStart: number; count: number }> =
+    new Map();
+
+  private static readonly MESSAGE_WINDOW_MS = 5000;
+  private static readonly MESSAGE_WINDOW_MAX = 10;
 
   constructor(private readonly conversationsService: ConversationsService) {}
 
@@ -74,18 +86,27 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage("message:send")
   async handleSendMessage(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() payload: { conversationId: string; body: string },
+    @MessageBody() body: unknown,
   ) {
     const userId = client.userId;
     if (!userId) {
       return { error: "Unauthorized" };
     }
 
+    const payload = this.transformPayload(SendMessagePayload, body);
+
+    const trimmedBody = payload.body.trim();
+    if (!trimmedBody) {
+      throw new WsException("Message body cannot be empty");
+    }
+
+    this.enforceRateLimit(userId);
+
     try {
       const message = await this.conversationsService.createMessage(
         payload.conversationId,
         userId,
-        { body: payload.body } as CreateMessageDto,
+        { body: trimmedBody } as CreateMessageDto,
       );
 
       // 대화방의 모든 참여자에게 메시지 전송
@@ -109,10 +130,12 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage("typing:start")
   handleTypingStart(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() payload: { conversationId: string },
+    @MessageBody() body: unknown,
   ) {
     const userId = client.userId;
     if (!userId) return;
+
+    const payload = this.transformPayload(ConversationPayload, body);
 
     client.to(`conversation:${payload.conversationId}`).emit("typing:user", {
       conversationId: payload.conversationId,
@@ -124,10 +147,12 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage("typing:stop")
   handleTypingStop(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() payload: { conversationId: string },
+    @MessageBody() body: unknown,
   ) {
     const userId = client.userId;
     if (!userId) return;
+
+    const payload = this.transformPayload(ConversationPayload, body);
 
     client.to(`conversation:${payload.conversationId}`).emit("typing:user", {
       conversationId: payload.conversationId,
@@ -142,10 +167,12 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage("message:read")
   async handleMessageRead(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() payload: { conversationId: string },
+    @MessageBody() body: unknown,
   ) {
     const userId = client.userId;
     if (!userId) return;
+
+    const payload = this.transformPayload(ConversationPayload, body);
 
     try {
       await this.conversationsService.markAsRead(
@@ -174,8 +201,9 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage("conversation:join")
   handleJoinConversation(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() payload: { conversationId: string },
+    @MessageBody() body: unknown,
   ) {
+    const payload = this.transformPayload(ConversationPayload, body);
     client.join(`conversation:${payload.conversationId}`);
     return { success: true };
   }
@@ -186,10 +214,46 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage("conversation:leave")
   handleLeaveConversation(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() payload: { conversationId: string },
+    @MessageBody() body: unknown,
   ) {
+    const payload = this.transformPayload(ConversationPayload, body);
     client.leave(`conversation:${payload.conversationId}`);
     return { success: true };
+  }
+
+  private transformPayload<T>(
+    cls: new () => T,
+    payload: unknown,
+  ): T {
+    const instance = plainToInstance(cls, payload);
+    const errors = validateSync(instance as object, {
+      whitelist: true,
+      forbidNonWhitelisted: true,
+    });
+
+    if (errors.length > 0) {
+      throw new WsException(errors[0].toString());
+    }
+
+    return instance;
+  }
+
+  private enforceRateLimit(userId: string) {
+    const now = Date.now();
+    const entry = this.messageThrottle.get(userId);
+
+    if (!entry || now - entry.windowStart > ChatGateway.MESSAGE_WINDOW_MS) {
+      this.messageThrottle.set(userId, {
+        windowStart: now,
+        count: 1,
+      });
+      return;
+    }
+
+    entry.count += 1;
+    if (entry.count > ChatGateway.MESSAGE_WINDOW_MAX) {
+      throw new WsException("Too many messages in a short period. Please slow down.");
+    }
   }
 
   /**

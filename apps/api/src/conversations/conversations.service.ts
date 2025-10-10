@@ -94,10 +94,18 @@ export class ConversationsService {
       throw new ForbiddenException("This conversation has ended");
     }
 
+    const sanitizedBody = createDto.body?.trim();
+    if (!sanitizedBody) {
+      throw new ForbiddenException("Message body cannot be empty");
+    }
+    if (sanitizedBody.length > 2000) {
+      throw new ForbiddenException("Message body is too long");
+    }
+
     const message = this.messageRepository.create({
       conversationId,
       senderUid: userId,
-      body: createDto.body,
+      body: sanitizedBody,
     });
 
     const savedMessage = await this.messageRepository.save(message);
