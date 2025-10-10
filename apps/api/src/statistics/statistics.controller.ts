@@ -1,4 +1,10 @@
-import { Controller, Get, Query, UseGuards } from "@nestjs/common";
+import {
+  BadRequestException,
+  Controller,
+  Get,
+  Query,
+  UseGuards,
+} from "@nestjs/common";
 import {
   ApiTags,
   ApiBearerAuth,
@@ -7,11 +13,12 @@ import {
 } from "@nestjs/swagger";
 import { StatisticsService } from "./statistics.service";
 import { FirebaseAuthGuard } from "../common/guards/firebase-auth.guard";
-// import { AdminGuard } from '../common/guards/admin.guard';
+import { AdminGuard } from "../common/guards/admin.guard";
+import { parseISO, isValid, isAfter } from "date-fns";
 
 @ApiTags("statistics")
 @Controller("v1/statistics")
-@UseGuards(FirebaseAuthGuard) // Should probably be an AdminGuard
+@UseGuards(FirebaseAuthGuard, AdminGuard)
 @ApiBearerAuth("firebase")
 export class StatisticsController {
   constructor(private readonly statisticsService: StatisticsService) {}
@@ -24,6 +31,17 @@ export class StatisticsController {
     @Query("startDate") startDate: string,
     @Query("endDate") endDate: string,
   ) {
+    const start = parseISO(startDate);
+    const end = parseISO(endDate);
+
+    if (!isValid(start) || !isValid(end)) {
+      throw new BadRequestException("startDate and endDate must be valid ISO dates");
+    }
+
+    if (isAfter(start, end)) {
+      throw new BadRequestException("startDate cannot be after endDate");
+    }
+
     return this.statisticsService.getStatistics(startDate, endDate);
   }
 }

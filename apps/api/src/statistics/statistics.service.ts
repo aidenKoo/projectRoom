@@ -1,7 +1,8 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, BadRequestException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, Between } from "typeorm";
 import { Statistic } from "./entities/statistic.entity";
+import { parseISO, isValid } from "date-fns";
 
 @Injectable()
 export class StatisticsService {
@@ -40,6 +41,13 @@ export class StatisticsService {
     startDate: string,
     endDate: string,
   ): Promise<Statistic[]> {
+    const start = parseISO(startDate);
+    const end = parseISO(endDate);
+
+    if (!isValid(start) || !isValid(end)) {
+      throw new BadRequestException("Invalid date range");
+    }
+
     return this.statisticRepository.find({
       where: {
         date: Between(startDate, endDate),
