@@ -1,9 +1,10 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Button,
   Card,
   Col,
+  DatePicker,
   Form,
   Image,
   Input,
@@ -11,7 +12,6 @@ import {
   Row,
   Select,
   Space,
-  Spin,
   Statistic,
   Table,
   Tag,
@@ -19,20 +19,44 @@ import {
   message,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
+import type { TablePaginationConfig } from 'antd/es/table';
+import dayjs, { Dayjs } from 'dayjs';
 import {
   fetchPhotoModerationQueue,
   moderatePhotoDecision,
+} from '../services/api';
+import type {
   ModerationPhotoRecord,
+  ModerationPhotoResponse,
 } from '../services/api';
 
 const { Title, Text } = Typography;
+const { RangePicker } = DatePicker;
+
+const DEFAULT_PAGE_SIZE = 20;
 
 const STATUS_OPTIONS: { value: ModerationPhotoRecord['status']; label: string; color: string }[] = [
-  { value: 'pending', label: '寃???湲?, color: 'blue' },
-  { value: 'auto_flagged', label: '?먮룞 ?뚮옒洹?, color: 'orange' },
-  { value: 'approved', label: '?뱀씤??, color: 'green' },
-  { value: 'rejected', label: '嫄곗젅??, color: 'red' },
+  { value: 'pending', label: 'Pending', color: 'blue' },
+  { value: 'auto_flagged', label: 'Auto-Flagged', color: 'orange' },
+  { value: 'approved', label: 'Approved', color: 'green' },
+  { value: 'rejected', label: 'Rejected', color: 'red' },
 ];
+
+type DateRange = [Dayjs | null, Dayjs | null] | null;
+
+type FilterState = {
+  statuses: string[];
+  search: string;
+  dateRange: DateRange;
+};
+
+type ModerationSummary = {
+  total: number;
+  pending: number;
+  autoFlagged: number;
+  approved: number;
+  rejected: number;
+};
 
 const statusTag = (status: ModerationPhotoRecord['status']) => {
   const entry = STATUS_OPTIONS.find((option) => option.value === status);
@@ -48,28 +72,56 @@ const statusTag = (status: ModerationPhotoRecord['status']) => {
 
 const nsfwTag = (record: ModerationPhotoRecord) => {
   if (!record.nsfw) {
-    return <Tag color="green">?뺤긽</Tag>;
+    return <Tag color="green">Safe</Tag>;
   }
-  const confidence = record.nsfwScore != null ? `쨌 ${(record.nsfwScore * 100).toFixed(0)}%` : '';
-  return <Tag color="red">NSFW {confidence}</Tag>;
+  const confidence = record.nsfwScore != null ? `${Math.round(record.nsfwScore * 100)}%` : 'Unknown';
+  return <Tag color="red">NSFW · {confidence}</Tag>;
 };
-
-const MAX_PREVIEW_WIDTH = 160;
 
 const formatDate = (value?: string | null) => {
   if (!value) return '-';
-  try {
-    return new Date(value).toLocaleString();
-  } catch {
-    return value;
-  }
+  const date = dayjs(value);
+  return date.isValid() ? date.format('YYYY-MM-DD HH:mm') : value;
+};
+
+const getSummary = (records: ModerationPhotoRecord[]): ModerationSummary => {
+  return records.reduce<ModerationSummary>(
+    (acc, record) => {
+      acc.total += 1;
+      if (record.status === 'pending') acc.pending += 1;
+      if (record.status === 'auto_flagged') acc.autoFlagged += 1;
+      if (record.status === 'approved') acc.approved += 1;
+      if (record.status === 'rejected') acc.rejected += 1;
+      return acc;
+    },
+    { total: 0, pending: 0, autoFlagged: 0, approved: 0, rejected: 0 },
+  );
 };
 
 const PhotoModeration: React.FC = () => {
-  const [photos, setPhotos] = useState<ModerationPhotoRecord[]>([]);
+  const [records, setRecords] = useState<ModerationPhotoRecord[]>([]);
+  const [summary, setSummary] = useState<ModerationSummary>({
+    total: 0,
+    pending: 0,
+    autoFlagged: 0,
+    approved: 0,
+    rejected: 0,
+  });
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>('');
-  const [selectedStatuses, setSelectedStatuses] = useState<string[]>(['pending', 'auto_flagged']);
+  const [filters, setFilters] = useState<FilterState>({
+    statuses: ['pending', 'auto_flagged'],
+    search: '',
+    dateRange: null,
+  });
+  const [searchValue, setSearchValue] = useState<string>('');
+  const [pagination, setPagination] = useState<{ current: number; pageSize: number; total: number }>(
+    {
+      current: 1,
+      pageSize: DEFAULT_PAGE_SIZE,
+      total: 0,
+    },
+  );
 
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState<ModerationPhotoRecord | null>(null);
@@ -77,39 +129,86 @@ const PhotoModeration: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [form] = Form.useForm<{ auditReason: string; note?: string }>();
 
-  const loadPhotos = async (statuses: string[]) => {
-    setLoading(true);
-    setError('');
-    try {
-      const data = await fetchPhotoModerationQueue(statuses);
-      setPhotos(data);
-    } catch (err) {
-      setError(`?湲곗뿴??遺덈윭?ㅼ? 紐삵뻽?듬땲?? ${String(err)}`);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const loadPhotos = useCallback(
+    async (page: number, pageSize: number) => {
+      setLoading(true);
+      setError('');
+      try {
+        const params: {
+          status?: string[];
+          search?: string;
+          page: number;
+          limit: number;
+          dateFrom?: string;
+          dateTo?: string;
+        } = {
+          status: filters.statuses.length ? filters.statuses : undefined,
+          search: filters.search || undefined,
+          page,
+          limit: pageSize,
+        };
+
+        if (filters.dateRange) {
+          const [start, end] = filters.dateRange;
+          if (start) {
+            params.dateFrom = start.format('YYYY-MM-DD');
+          }
+          if (end) {
+            params.dateTo = end.format('YYYY-MM-DD');
+          }
+        }
+
+        const response: ModerationPhotoResponse = await fetchPhotoModerationQueue(params);
+        setRecords(response.items);
+        setSummary(getSummary(response.items));
+        setPagination({
+          current: response.meta.currentPage,
+          pageSize: response.meta.itemsPerPage,
+          total: response.meta.totalItems,
+        });
+      } catch (err) {
+        setError(`Failed to load moderation queue: ${String(err)}`);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [filters.statuses, filters.search, filters.dateRange],
+  );
 
   useEffect(() => {
-    loadPhotos(selectedStatuses);
-  }, [selectedStatuses]);
+    loadPhotos(1, pagination.pageSize);
+  }, [filters.statuses, filters.search, filters.dateRange, loadPhotos]);
 
-  const summary = useMemo(() => {
-    const counts = photos.reduce<Record<string, number>>((acc, photo) => {
-      acc[photo.status] = (acc[photo.status] ?? 0) + 1;
-      return acc;
-    }, {});
+  const handleStatusChange = (values: string[]) => {
+    setFilters((prev) => ({ ...prev, statuses: values }));
+    setPagination((prev) => ({ ...prev, current: 1 }));
+  };
 
-    return {
-      total: photos.length,
-      pending: counts.pending ?? 0,
-      autoFlagged: counts.auto_flagged ?? 0,
-      approved: counts.approved ?? 0,
-      rejected: counts.rejected ?? 0,
-    };
-  }, [photos]);
+  const handleDateRangeChange = (
+    range: DateRange,
+    _dateStrings: [string, string],
+  ) => {
+    setFilters((prev) => ({ ...prev, dateRange: range }));
+    setPagination((prev) => ({ ...prev, current: 1 }));
+  };
 
-  const openDecisionModal = (record: ModerationPhotoRecord, nextDecision: 'approve' | 'reject') => {
+  const handleSearch = () => {
+    const trimmed = searchValue.trim();
+    setFilters((prev) => ({ ...prev, search: trimmed }));
+    setPagination((prev) => ({ ...prev, current: 1 }));
+  };
+
+  const handleTableChange = (tablePagination: TablePaginationConfig) => {
+    const current = tablePagination.current ?? 1;
+    const pageSize = tablePagination.pageSize ?? pagination.pageSize;
+    setPagination({ current, pageSize, total: pagination.total });
+    loadPhotos(current, pageSize);
+  };
+
+  const openDecisionModal = (
+    record: ModerationPhotoRecord,
+    nextDecision: 'approve' | 'reject',
+  ) => {
     setSelectedPhoto(record);
     setDecision(nextDecision);
     setModalVisible(true);
@@ -121,47 +220,42 @@ const PhotoModeration: React.FC = () => {
     try {
       const values = await form.validateFields();
       setSubmitting(true);
-      const updated = await moderatePhotoDecision(
+      await moderatePhotoDecision(
         selectedPhoto.id,
         decision,
         values.auditReason,
         values.note,
       );
-      setPhotos((prev) =>
-        prev.map((item) => (item.id === updated.id ? updated : item)).filter((item) => {
-          if (selectedStatuses.length === 0) return true;
-          return selectedStatuses.includes(item.status);
-        }),
-      );
       setModalVisible(false);
-      message.success(decision === 'approve' ? '?ъ쭊???뱀씤?섏뿀?듬땲??' : '?ъ쭊??嫄곗젅?섏뿀?듬땲??');
+      message.success(decision === 'approve' ? 'Photo approved.' : 'Photo rejected.');
+      await loadPhotos(pagination.current, pagination.pageSize);
     } catch (err) {
       if ((err as any)?.errorFields) {
         return;
       }
-      message.error(`寃곗젙 ?곸슜???ㅽ뙣?덉뒿?덈떎: ${String(err)}`);
+      message.error(`Failed to apply moderation decision: ${String(err)}`);
     } finally {
       setSubmitting(false);
     }
   };
 
-  const columns: ColumnsType<ModerationPhotoRecord> = useMemo(
-    () => [
+  const columns: ColumnsType<ModerationPhotoRecord> = useMemo(() => {
+    return [
       {
-        title: '?ъ쭊',
+        title: 'Photo',
         dataIndex: 'photo',
         key: 'photo',
         render: (photo: ModerationPhotoRecord['photo']) => (
           <Image
             src={photo.publicUrl ?? ''}
             alt={photo.objectPath}
-            style={{ width: MAX_PREVIEW_WIDTH, borderRadius: 8 }}
+            style={{ width: 160, borderRadius: 8, objectFit: 'cover' }}
             fallback="https://via.placeholder.com/160?text=No+Image"
           />
         ),
       },
       {
-        title: '?곹깭',
+        title: 'Status',
         dataIndex: 'status',
         key: 'status',
         render: (_value, record) => (
@@ -172,217 +266,191 @@ const PhotoModeration: React.FC = () => {
         ),
       },
       {
-        title: '?ъ슜??,
+        title: 'User',
         dataIndex: 'user',
         key: 'user',
         render: (user: ModerationPhotoRecord['user']) => (
           <Space direction="vertical" size={0}>
             <Text strong>{user.name ?? user.uid ?? `UID-${user.id}`}</Text>
             <Text type="secondary" style={{ fontSize: 12 }}>
-              {user.email ?? '-'}
+              {user.email ?? 'Email unavailable'}
             </Text>
             <Text type="secondary" style={{ fontSize: 12 }}>
-              {user.regionCode ?? '吏??誘몄엯??}
+              {user.regionCode ?? 'Region unknown'}
             </Text>
           </Space>
         ),
       },
       {
-        title: '硫뷀??뺣낫',
+        title: 'Metadata',
         key: 'meta',
         render: (_value, record) => (
           <Space direction="vertical" size={0}>
-            <Text>寃쎈줈: {record.photo.objectPath}</Text>
+            <Text>Path: {record.photo.objectPath}</Text>
             <Text>
-              ?댁긽??{' '}
+              Resolution:{' '}
               {record.photo.width && record.photo.height
-                ? `${record.photo.width}x${record.photo.height}`
-                : '誘몄긽'}
+                ? `${record.photo.width}×${record.photo.height}`
+                : 'Unknown'}
             </Text>
-            <Text>?⑸웾: {record.photo.bytes != null ? `${((record.photo.bytes ?? 0) / 1024).toFixed(1)} KB` : '誘몄긽'}</Text>
-            <Text>????ъ쭊: {record.photo.isPrimary ? '?? : '?꾨땲??}</Text>
+            <Text>Bytes: {record.photo.bytes ?? 'Unknown'}</Text>
+            <Text>Uploaded: {formatDate(record.photo.createdAt)}</Text>
           </Space>
         ),
       },
       {
-        title: '?뚮옒洹?,
-        dataIndex: 'labels',
-        key: 'labels',
-        render: (labels: string[]) =>
-          labels && labels.length > 0 ? (
-            <Space wrap>
-              {labels.map((label) => (
-                <Tag key={label} color="volcano">
-                  {label}
-                </Tag>
-              ))}
-            </Space>
-          ) : (
-            <Text type="secondary">-</Text>
-          ),
-      },
-      {
-        title: '寃??硫붾え',
-        dataIndex: 'reviewNotes',
-        key: 'reviewNotes',
-        render: (value: string | null | undefined) =>
-          value ? <Text>{value}</Text> : <Text type="secondary">-</Text>,
-      },
-      {
-        title: '理쒓렐 ?낅뜲?댄듃',
-        dataIndex: 'updatedAt',
-        key: 'updatedAt',
+        title: 'Review',
+        key: 'review',
         render: (_value, record) => (
           <Space direction="vertical" size={0}>
-            <Text>{formatDate(record.reviewedAt)}</Text>
-            <Text type="secondary" style={{ fontSize: 12 }}>
-              {record.reviewedBy ?? ''}
-            </Text>
+            <Text>Created: {formatDate(record.createdAt)}</Text>
+            <Text>Reviewed: {formatDate(record.reviewedAt)}</Text>
+            {record.reviewNotes && (
+              <Text type="secondary">Notes: {record.reviewNotes}</Text>
+            )}
+            {record.labels && record.labels.length > 0 && (
+              <Text type="secondary">Labels: {record.labels.join(', ')}</Text>
+            )}
           </Space>
         ),
       },
       {
-        title: '議곗튂',
-        key: 'action',
+        title: 'Actions',
+        key: 'actions',
         render: (_value, record) => (
           <Space>
-            <Button
-              type="primary"
-              ghost
-              onClick={() => openDecisionModal(record, 'approve')}
-              disabled={record.status === 'approved'}
-            >
-              ?뱀씤
+            <Button type="link" onClick={() => openDecisionModal(record, 'approve')}>
+              Approve
             </Button>
-            <Button
-              danger
-              onClick={() => openDecisionModal(record, 'reject')}
-              disabled={record.status === 'rejected'}
-            >
-              嫄곗젅
+            <Button type="link" danger onClick={() => openDecisionModal(record, 'reject')}>
+              Reject
             </Button>
           </Space>
         ),
       },
-    ],
-    [],
-  );
+    ];
+  }, []);
 
   return (
     <div>
-      <Title level={2} style={{ marginBottom: 12 }}>
-        ?ъ쭊 紐⑤뜑?덉씠??      </Title>
-      <Text type="secondary">
-        Firebase Storage ?낅줈????Cloud Function?먯꽌 ?꾨떖???ъ쭊 硫뷀??곗씠?곕? 湲곕컲?쇰줈 NSFW ?뚮옒洹몃? 寃?좏븯?몄슂.
-      </Text>
+      <Title level={2} style={{ marginBottom: 24 }}>
+        Photo Moderation
+      </Title>
 
-      <Row gutter={[16, 16]} style={{ marginTop: 24 }}>
-        <Col xs={24} sm={12} md={6}>
-          <Card>
-            <Statistic title="?湲곗뿴" value={summary.total} />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} md={6}>
-          <Card>
-            <Statistic title="寃???湲? value={summary.pending} valueStyle={{ color: '#1677ff' }} />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} md={6}>
-          <Card>
-            <Statistic title="?먮룞 ?뚮옒洹? value={summary.autoFlagged} valueStyle={{ color: '#fa8c16' }} />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} md={6}>
-          <Card>
-            <Statistic title="?뱀씤?? value={summary.approved} valueStyle={{ color: '#3f8600' }} />
-          </Card>
-        </Col>
-      </Row>
-
-      <Card style={{ marginTop: 24 }}>
-        <Space style={{ marginBottom: 16 }} size="large" wrap>
-          <div>
-            <Text strong>?곹깭 ?꾪꽣</Text>
-            <Select
-              mode="multiple"
-              allowClear
-              placeholder="?꾪꽣留곹븷 ?곹깭瑜??좏깮?섏꽭??
-              style={{ minWidth: 240, marginLeft: 12 }}
-              value={selectedStatuses}
-              onChange={(value) => setSelectedStatuses(value)}
-              options={STATUS_OPTIONS.map((option) => ({
-                label: option.label,
-                value: option.value,
-              }))}
-            />
-          </div>
-          <Button onClick={() => loadPhotos(selectedStatuses)} icon={loading ? undefined : undefined}>
-            ?덈줈怨좎묠
-          </Button>
-        </Space>
-
-        {error && (
-          <Alert
-            type="error"
-            message={error}
-            showIcon
-            style={{ marginBottom: 16 }}
-            action={
-              <Button size="small" onClick={() => loadPhotos(selectedStatuses)}>
-                ?ㅼ떆 ?쒕룄
-              </Button>
-            }
-          />
-        )}
-
-        <Table<ModerationPhotoRecord>
-          rowKey={(record) => record.id}
-          columns={columns}
-          dataSource={photos}
-          loading={loading}
-          pagination={{ pageSize: 6, showSizeChanger: false }}
-          scroll={{ x: 1200 }}
-          locale={{
-            emptyText: loading ? <Spin /> : '寃?좏븷 ?ъ쭊???놁뒿?덈떎.',
-          }}
-        />
+      <Card style={{ marginBottom: 24 }}>
+        <Row gutter={[16, 16]}>
+          <Col xs={12} sm={6} md={4}>
+            <Statistic title="Total" value={summary.total} />
+          </Col>
+          <Col xs={12} sm={6} md={4}>
+            <Statistic title="Pending" value={summary.pending} />
+          </Col>
+          <Col xs={12} sm={6} md={4}>
+            <Statistic title="Auto-Flagged" value={summary.autoFlagged} />
+          </Col>
+          <Col xs={12} sm={6} md={4}>
+            <Statistic title="Approved" value={summary.approved} />
+          </Col>
+          <Col xs={12} sm={6} md={4}>
+            <Statistic title="Rejected" value={summary.rejected} />
+          </Col>
+        </Row>
       </Card>
 
+      <Card style={{ marginBottom: 24 }}>
+        <Space wrap align="center">
+          <Select
+            mode="multiple"
+            allowClear
+            style={{ minWidth: 220 }}
+            placeholder="Filter by status"
+            value={filters.statuses}
+            onChange={handleStatusChange}
+            options={STATUS_OPTIONS.map((option) => ({
+              value: option.value,
+              label: option.label,
+            }))}
+          />
+
+          <Input
+            placeholder="Search by email, name, or UID"
+            style={{ width: 260 }}
+            value={searchValue}
+            onChange={(event) => setSearchValue(event.target.value)}
+            onPressEnter={handleSearch}
+            allowClear
+          />
+
+          <Button type="primary" onClick={handleSearch}>
+            Search
+          </Button>
+
+          <RangePicker
+            value={filters.dateRange}
+            onChange={handleDateRangeChange}
+            allowClear
+          />
+
+          <Button onClick={() => loadPhotos(pagination.current, pagination.pageSize)}>
+            Refresh
+          </Button>
+        </Space>
+      </Card>
+
+      {error && (
+        <Alert message={error} type="error" showIcon style={{ marginBottom: 16 }} />
+      )}
+
+      <Table
+        rowKey="id"
+        columns={columns}
+        dataSource={records}
+        loading={loading}
+        pagination={{
+          current: pagination.current,
+          pageSize: pagination.pageSize,
+          total: pagination.total,
+          showSizeChanger: true,
+          pageSizeOptions: ['10', '20', '50', '100'],
+        }}
+        onChange={handleTableChange}
+      />
+
       <Modal
-        title={decision === 'approve' ? '?ъ쭊 ?뱀씤' : '?ъ쭊 嫄곗젅'}
+        title={decision === 'approve' ? 'Approve Photo' : 'Reject Photo'}
         open={modalVisible}
+        okText={decision === 'approve' ? 'Approve' : 'Reject'}
+        okButtonProps={{ loading: submitting, danger: decision === 'reject' }}
         onOk={handleDecisionSubmit}
-        okText={decision === 'approve' ? '?뱀씤' : '嫄곗젅'}
-        okButtonProps={{ loading: submitting, type: decision === 'approve' ? 'primary' : 'default', danger: decision === 'reject' }}
         onCancel={() => {
           if (!submitting) {
             setModalVisible(false);
           }
         }}
-        cancelButtonProps={{ disabled: submitting }}
+        destroyOnClose
       >
-        <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-          <Text>
-            {selectedPhoto?.user.name ?? selectedPhoto?.user.uid ?? '?ъ슜??}???ъ쭊?????' '}
-            <Text strong>{decision === 'approve' ? '?뱀씤' : '嫄곗젅'}</Text> 泥섎━瑜??곸슜?⑸땲??
-          </Text>
-          <Form form={form} layout="vertical" requiredMark="optional">
-            <Form.Item
-              label="媛먯궗 ?ъ쑀 (X-Audit-Reason)"
-              name="auditReason"
-              rules={[{ required: true, message: '媛먯궗 ?ъ쑀瑜??낅젰?댁＜?몄슂.' }]}
-            >
-              <Input.TextArea rows={3} placeholder="?? ?ъ슜???좉퀬 ?뺤씤 / ?꾨줈??媛?대뱶 ?꾨컲" />
-            </Form.Item>
-            <Form.Item
-              label="硫붾え"
-              name="note"
-              rules={[{ max: 255, message: '255???대궡濡??낅젰?댁＜?몄슂.' }]}
-            >
-              <Input.TextArea rows={3} placeholder="寃??硫붾え (?좏깮)" />
-            </Form.Item>
-          </Form>
-        </Space>
+        {selectedPhoto && (
+          <Space direction="vertical" style={{ width: '100%' }} size="large">
+            <Image
+              src={selectedPhoto.photo.publicUrl ?? ''}
+              alt={selectedPhoto.photo.objectPath}
+              style={{ width: '100%', borderRadius: 8 }}
+              fallback="https://via.placeholder.com/320?text=No+Image"
+            />
+            <Form form={form} layout="vertical">
+              <Form.Item
+                name="auditReason"
+                label="Audit Reason"
+                rules={[{ required: true, message: 'Please provide an audit reason.' }]}
+              >
+                <Input.TextArea rows={3} maxLength={255} placeholder="Explain your moderation decision." />
+              </Form.Item>
+              <Form.Item name="note" label="Reviewer Notes">
+                <Input.TextArea rows={3} maxLength={255} placeholder="Optional notes (visible to admin team)." />
+              </Form.Item>
+            </Form>
+          </Space>
+        )}
       </Modal>
     </div>
   );

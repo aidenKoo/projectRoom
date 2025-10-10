@@ -110,13 +110,49 @@ export type ModerationPhotoRecord = {
   };
 };
 
-export async function fetchPhotoModerationQueue(status?: string[]) {
-  const params: Record<string, string> = {};
-  if (status && status.length > 0) {
-    params.status = status.join(',');
+export type PaginationMeta = {
+  totalItems: number;
+  itemsPerPage: number;
+  currentPage: number;
+  totalPages: number;
+  hasNextPage: boolean;
+};
+
+export type ModerationPhotoResponse = {
+  items: ModerationPhotoRecord[];
+  meta: PaginationMeta;
+};
+
+export async function fetchPhotoModerationQueue(params?: {
+  status?: string[];
+  search?: string;
+  page?: number;
+  limit?: number;
+  dateFrom?: string;
+  dateTo?: string;
+}) {
+  const query: Record<string, string | number> = {};
+  if (params?.status && params.status.length > 0) {
+    query.status = params.status.join(',');
   }
-  const response = await api.get<ModerationPhotoRecord[]>('/admin/moderation/photos', {
-    params,
+  if (params?.search) {
+    query.search = params.search;
+  }
+  if (params?.page) {
+    query.page = params.page;
+  }
+  if (params?.limit) {
+    query.limit = params.limit;
+  }
+  if (params?.dateFrom) {
+    query.dateFrom = params.dateFrom;
+  }
+  if (params?.dateTo) {
+    query.dateTo = params.dateTo;
+  }
+
+  const response = await api.get<ModerationPhotoResponse>('/admin/moderation/photos', {
+    params: query,
   });
   return response.data;
 }

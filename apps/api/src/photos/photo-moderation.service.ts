@@ -25,6 +25,15 @@ interface ModerationDecision {
   severity?: "low" | "medium" | "high";
 }
 
+export interface ModerationQueueOptions {
+  statuses?: PhotoModerationStatus[];
+  searchTerm?: string;
+  dateFrom?: Date;
+  dateTo?: Date;
+  page?: number;
+  limit?: number;
+}
+
 @Injectable()
 export class PhotoModerationService {
   private readonly logger = new Logger(PhotoModerationService.name);
@@ -87,16 +96,60 @@ export class PhotoModerationService {
   }
 
   async getModerationQueue(
-    status: PhotoModerationStatus[] = [
-      PhotoModerationStatus.PENDING,
-      PhotoModerationStatus.AUTO_FLAGGED,
-    ],
-  ): Promise<PhotoMeta[]> {
-    return this.photoMetaRepository.find({
-      where: status.map((value) => ({ status: value })),
-      relations: { photo: { user: true } },
-      order: { createdAt: "ASC" },
-    });
+    options: ModerationQueueOptions = {},
+  ): Promise<{ items: PhotoMeta[]; total: number; page: number; limit: number }> {
+    const {
+      statuses = [
+        PhotoModerationStatus.PENDING,
+        PhotoModerationStatus.AUTO_FLAGGED,
+      ],
+      searchTerm,
+      dateFrom,
+      dateTo,
+      page = 1,
+      limit = 20,
+    } = options;
+
+    const safePage = Math.max(1, page);
+    const safeLimit = Math.min(Math.max(limit, 1), 100);
+
+    const qb = this.photoMetaRepository
+      .createQueryBuilder("meta")
+      .leftJoinAndSelect("meta.photo", "photo")
+      .leftJoinAndSelect("photo.user", "user")
+      .orderBy("meta.created_at", "DESC");
+
+    if (statuses.length > 0) {
+      qb.andWhere("meta.status IN (:...statuses)", { statuses });
+    }
+
+    if (searchTerm) {
+      const term = `%${searchTerm.toLowerCase()}%`;
+      qb.andWhere(
+        "(LOWER(user.email) LIKE :term OR LOWER(user.display_name) LIKE :term OR LOWER(user.firebase_uid) LIKE :term)",
+        { term },
+      );
+    }
+
+    if (dateFrom) {
+      qb.andWhere("meta.created_at >= :dateFrom", { dateFrom });
+    }
+
+    if (dateTo) {
+      qb.andWhere("meta.created_at <= :dateTo", { dateTo });
+    }
+
+    const [items, total] = await qb
+      .skip((safePage - 1) * safeLimit)
+      .take(safeLimit)
+      .getManyAndCount();
+
+    return {
+      items,
+      total,
+      page: safePage,
+      limit: safeLimit,
+    };
   }
 
   async applyDecision(

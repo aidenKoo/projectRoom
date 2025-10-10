@@ -14,6 +14,7 @@ import { Recommendation } from '../match/entities/recommendation.entity';
 import { Message } from '../conversations/entities/message.entity';
 import { Repository } from 'typeorm';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { PhotoModerationService } from '../photos/photo-moderation.service';
 
 describe('AdminService', () => {
   let service: AdminService;
@@ -70,6 +71,14 @@ describe('AdminService', () => {
           provide: AuditLogsService,
           useValue: {
             createLog: jest.fn(),
+          },
+        },
+        {
+          provide: PhotoModerationService,
+          useValue: {
+            getModerationQueue: jest.fn(),
+            getMetaById: jest.fn(),
+            applyDecision: jest.fn(),
           },
         },
       ],

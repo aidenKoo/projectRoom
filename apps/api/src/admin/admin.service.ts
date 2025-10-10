@@ -14,7 +14,10 @@ import { Message } from "../conversations/entities/message.entity";
 import * as crypto from "crypto";
 import { AuditLogsService } from "../audit-logs/audit-logs.service";
 import { AuditAction } from "../audit-logs/entities/audit-log.entity";
-import { PhotoModerationService } from "../photos/photo-moderation.service";
+import {
+  ModerationQueueOptions,
+  PhotoModerationService,
+} from "../photos/photo-moderation.service";
 import {
   PhotoMeta,
   PhotoModerationStatus,
@@ -433,15 +436,25 @@ export class AdminService {
     };
   }
 
-  async getPhotoModerationQueue(
-    status: PhotoModerationStatus[] = [
-      PhotoModerationStatus.PENDING,
-      PhotoModerationStatus.AUTO_FLAGGED,
-    ],
-  ) {
-    const queue = await this.photoModerationService.getModerationQueue(status);
+  async getPhotoModerationQueue(options: ModerationQueueOptions = {}) {
+    const {
+      items: queue,
+      total,
+      page,
+      limit,
+    } = await this.photoModerationService.getModerationQueue(options);
+
     if (queue.length === 0) {
-      return [];
+      return {
+        items: [],
+        meta: {
+          totalItems: total,
+          itemsPerPage: limit,
+          currentPage: page,
+          totalPages: total > 0 ? Math.ceil(total / limit) : 1,
+          hasNextPage: false,
+        },
+      };
     }
 
     const userIds = Array.from(new Set(queue.map((meta) => meta.userId)));
@@ -457,13 +470,26 @@ export class AdminService {
       profiles.map((profile) => [profile.user_id, profile]),
     );
 
-    return queue.map((meta) =>
+    const items = queue.map((meta) =>
       this.serializePhotoMeta(
         meta,
-        userMap.get(meta.userId),
+        userMap.get(meta.userId) ?? meta.photo?.user,
         profileMap.get(meta.userId),
       ),
     );
+
+    const totalPages = Math.max(Math.ceil(total / limit), 1);
+
+    return {
+      items,
+      meta: {
+        totalItems: total,
+        itemsPerPage: limit,
+        currentPage: page,
+        totalPages,
+        hasNextPage: page < totalPages,
+      },
+    };
   }
 
   async moderatePhoto(

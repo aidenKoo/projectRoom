@@ -15,11 +15,8 @@ import {
   Typography,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import api, {
-  MatchQueueRecommendation,
-  MatchQueueResponse,
-  fetchMatchQueue,
-} from '../services/api';
+import api, { fetchMatchQueue } from '../services/api';
+import type { MatchQueueRecommendation, MatchQueueResponse } from '../services/api';
 
 const { Title, Text } = Typography;
 

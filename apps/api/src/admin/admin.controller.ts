@@ -18,6 +18,7 @@ import { AuditAction } from "../audit-logs/entities/audit-log.entity";
 import { extractRequestContext } from "../common/utils/request-context.util";
 import { ModeratePhotoDto, PhotoModerationDecision } from "./dto/moderate-photo.dto";
 import { PhotoModerationStatus } from "../photos/entities/photo-meta.entity";
+import { startOfDay, endOfDay, parseISO, isValid, isAfter } from "date-fns";
 
 @Controller("admin")
 @UseGuards(FirebaseAuthGuard, AdminGuard)
@@ -120,7 +121,14 @@ export class AdminController {
   }
 
   @Get("moderation/photos")
-  async getPhotoModerationQueue(@Query("status") status?: string) {
+  async getPhotoModerationQueue(
+    @Query("status") status?: string,
+    @Query("search") search?: string,
+    @Query("page") pageParam?: string,
+    @Query("limit") limitParam?: string,
+    @Query("dateFrom") dateFromParam?: string,
+    @Query("dateTo") dateToParam?: string,
+  ) {
     const allowedStatuses = Object.values(PhotoModerationStatus);
     const parsedStatuses = status
       ?.split(",")
@@ -132,7 +140,48 @@ export class AdminController {
     const statuses =
       parsedStatuses && parsedStatuses.length > 0 ? parsedStatuses : undefined;
 
-    return this.adminService.getPhotoModerationQueue(statuses);
+    const page = pageParam ? parseInt(pageParam, 10) : 1;
+    const limit = limitParam ? parseInt(limitParam, 10) : 20;
+
+    if (Number.isNaN(page) || page < 1) {
+      throw new BadRequestException("page must be a positive integer");
+    }
+
+    if (Number.isNaN(limit) || limit < 1 || limit > 100) {
+      throw new BadRequestException("limit must be between 1 and 100");
+    }
+
+    let dateFrom: Date | undefined;
+    let dateTo: Date | undefined;
+
+    if (dateFromParam) {
+      const parsed = parseISO(dateFromParam);
+      if (!isValid(parsed)) {
+        throw new BadRequestException("dateFrom must be a valid ISO date");
+      }
+      dateFrom = startOfDay(parsed);
+    }
+
+    if (dateToParam) {
+      const parsed = parseISO(dateToParam);
+      if (!isValid(parsed)) {
+        throw new BadRequestException("dateTo must be a valid ISO date");
+      }
+      dateTo = endOfDay(parsed);
+    }
+
+    if (dateFrom && dateTo && isAfter(dateFrom, dateTo)) {
+      throw new BadRequestException("dateFrom cannot be after dateTo");
+    }
+
+    return this.adminService.getPhotoModerationQueue({
+      statuses,
+      searchTerm: search?.trim() || undefined,
+      page,
+      limit,
+      dateFrom,
+      dateTo,
+    });
   }
 
   @Post("moderation/photos/:id/decision")
