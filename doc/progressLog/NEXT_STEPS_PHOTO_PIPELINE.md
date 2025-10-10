@@ -28,9 +28,9 @@
 ## 3. Outstanding Gaps / Next Steps
 1. **Supabase Trigger Flow**
    - ✅ Edge Function이 백엔드 Webhook으로 결과를 전달하도록 전환(2025-10-12 완료).
-   - ✅ Storage 업로드 → `/internal/photos/storage/upload` webhook 경유로 자동 심사 요청(백엔드 엔드포인트 신설).
-   - [ ] Firebase Storage 이벤트 혹은 Supabase Storage Hook에서 새 webhook 호출하도록 인프라 설정.
-   - [ ] Cloud Function 제공 해시/메타데이터 수집 후 `photo_meta.hash` 저장.
+   - ✅ Storage 업로드 → `/internal/photos/storage/upload` webhook 경유로 자동 심사 요청(백엔드 엔드포인트 + Cloud Function 연계 완료).
+   - [ ] Cloud Function 환경 변수(secrets) 배포 및 재시도/알람 설정.
+  - [ ] Cloud Function 제공 해시/메타데이터 수집 후 `photo_meta.hash` 저장.
 2. **NSFW Auto Flow**
    - Replace placeholder `type: "photo_caption"` payload with actual binary-safe moderation function (pass signed URL or base64).
    - Store moderation confidence curve and raw labels in a dedicated JSON schema (`{ provider, label, score }`).

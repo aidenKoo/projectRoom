@@ -1,7 +1,7 @@
 
-import * as functions from "firebase-functions";
+import * as functions from "firebase-functions/v1";
 import * as admin from "firebase-admin";
-import * as sharp from "sharp";
+import sharp from "sharp";
 import * as path from "path";
 import * as os from "os";
 import * as fs from "fs";
@@ -11,11 +11,14 @@ admin.initializeApp();
 const THUMB_MAX_WIDTH = 256;
 const THUMB_MAX_HEIGHT = 256;
 
+const STORAGE_WEBHOOK_URL = functions.config().photo?.storage_webhook_url;
+const STORAGE_WEBHOOK_SECRET = functions.config().photo?.storage_webhook_secret;
+
 export const generateThumbnail = functions
   .region("asia-northeast3") // Seoul
   .storage
   .object()
-  .onFinalize(async (object) => {
+  .onFinalize(async (object: functions.storage.ObjectMetadata) => {
     const filePath = object.name;
     const contentType = object.contentType;
     const bucket = admin.storage().bucket(object.bucket);
@@ -70,4 +73,67 @@ export const generateThumbnail = functions
 
     // 7. Clean up the temporary files.
     return fs.unlinkSync(tempFilePath);
+  });
+
+export const moderatePhotoOnUpload = functions
+  .region("asia-northeast3")
+  .storage.object()
+  .onFinalize(async (object: functions.storage.ObjectMetadata) => {
+    const filePath = object.name;
+
+    if (!filePath) {
+      functions.logger.log("moderation skipped: no file path");
+      return null;
+    }
+
+    if (!filePath.startsWith("users/") || !filePath.includes("/photos/")) {
+      functions.logger.log(
+        `moderation skipped: not a user photo path (${filePath})`,
+      );
+      return null;
+    }
+
+    if (!STORAGE_WEBHOOK_URL || !STORAGE_WEBHOOK_SECRET) {
+      functions.logger.error(
+        "PHOTO storage webhook configuration missing; skipping moderation",
+      );
+      return null;
+    }
+
+    const payload = {
+      record: {
+        name: filePath,
+        bucket: object.bucket,
+        metadata: object.metadata ?? {},
+      },
+    };
+
+    try {
+      const response = await fetch(STORAGE_WEBHOOK_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-webhook-secret": STORAGE_WEBHOOK_SECRET,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(
+          `Webhook responded with ${response.status}: ${text}`,
+        );
+      }
+
+      functions.logger.log(
+        `Moderation webhook invoked for ${filePath} (${response.status})`,
+      );
+    } catch (error) {
+      functions.logger.error(
+        `Failed to invoke moderation webhook for ${filePath}:`,
+        error,
+      );
+    }
+
+    return null;
   });
