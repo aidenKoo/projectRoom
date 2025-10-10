@@ -10,12 +10,14 @@ import { Like } from "./entities/like.entity";
 import { Match } from "./entities/match.entity";
 import { Recommendation } from "./entities/recommendation.entity";
 import { ProfilePrivate } from "../profiles-private/entities/profile-private.entity";
+import { getScoringConfig, ScoringConfig } from "./config/scoring-config";
 
 interface ScoreResult {
   totalScore: number;
   breakdown: any;
   sharedBits: string[];
   reason: string;
+  appliedConfig?: string;
 }
 
 @Injectable()
@@ -108,7 +110,10 @@ export class MatchScorerService {
   async calculateScore(
     userId: string,
     targetUserId: string,
+    experimentKey?: string,
   ): Promise<ScoreResult> {
+    const config = getScoringConfig(experimentKey);
+
     const [myUser, targetUser] = await Promise.all([
       this.userRepository.findOneBy({ firebase_uid: userId }),
       this.userRepository.findOneBy({ firebase_uid: targetUserId }),
@@ -120,6 +125,7 @@ export class MatchScorerService {
         breakdown: {},
         sharedBits: [],
         reason: "사용자 정보 없음",
+        appliedConfig: experimentKey || "default",
       };
     }
 
@@ -158,10 +164,12 @@ export class MatchScorerService {
             if (targetAge >= minAge && targetAge <= maxAge) {
               similarity = 1;
               sharedBits.push(`나이 ${targetAge}세`);
-            } else if (targetAge === minAge - 1 || targetAge === maxAge + 1) {
-              similarity = 0.8; // 경계값에서 1년 차이
+            } else if (
+              Math.abs(targetAge - minAge) <= config.ageBoundaryTolerance ||
+              Math.abs(targetAge - maxAge) <= config.ageBoundaryTolerance
+            ) {
+              similarity = config.ageBoundarySimilarity;
             }
-            // 선형 감쇠는 추후 구체적인 규칙에 따라 추가 가능
             break;
 
           case "height_cm_range":
@@ -171,11 +179,10 @@ export class MatchScorerService {
               similarity = 1;
               sharedBits.push(`키 ${targetHeight}cm`);
             } else if (
-              targetHeight >= minHeight - 5 &&
-              targetHeight <= maxHeight + 5
+              targetHeight >= minHeight - config.heightTolerance &&
+              targetHeight <= maxHeight + config.heightTolerance
             ) {
-              // 키는 5cm 범위까지 유사도 부여
-              similarity = 0.8;
+              similarity = config.heightBoundarySimilarity;
             }
             break;
 
@@ -228,13 +235,13 @@ export class MatchScorerService {
               similarity = 1.0;
               sharedBits.push(`선호 지역: ${targetUser.region_code}`);
             } else {
-              similarity = 0.3; // 기본 점수
+              similarity = config.regionNonMatchScore;
             }
             break;
 
           case "mbti":
             const preferredMbtis = item.value as string[];
-            const targetMbti = (targetProfile.mbti || [])[0]; // 대상은 첫번째 MBTI만 고려
+            const targetMbti = (targetProfile.mbti || [])[0];
             if (targetMbti && preferredMbtis.length > 0) {
               let maxMbtiScore = 0;
               for (const prefMbti of preferredMbtis) {
@@ -244,10 +251,10 @@ export class MatchScorerService {
                     matchingLetters++;
                   }
                 }
-                maxMbtiScore = Math.max(
-                  maxMbtiScore,
-                  (matchingLetters / 4) * 0.8 + 0.2,
-                );
+                const partialScore =
+                  (matchingLetters / 4) * (config.mbtiMaxScore - config.mbtiBaseScore) +
+                  config.mbtiBaseScore;
+                maxMbtiScore = Math.max(maxMbtiScore, partialScore);
               }
               similarity = maxMbtiScore;
             }
@@ -278,17 +285,21 @@ export class MatchScorerService {
 
     // Confidence Boost
     if (targetProfilePrivate) {
-      if ((targetProfilePrivate.lookConfidence || 0) >= 4) {
-        totalScore *= 1.05;
-        breakdown.lookConfidenceBoost = 0.05;
+      if (
+        (targetProfilePrivate.lookConfidence || 0) >= config.lookConfidenceThreshold
+      ) {
+        totalScore *= config.lookConfidenceBoost;
+        breakdown.lookConfidenceBoost = config.lookConfidenceBoost - 1;
       }
-      if ((targetProfilePrivate.bodyConfidence || 0) >= 4) {
-        totalScore *= 1.05;
-        breakdown.bodyConfidenceBoost = 0.05;
+      if (
+        (targetProfilePrivate.bodyConfidence || 0) >= config.bodyConfidenceThreshold
+      ) {
+        totalScore *= config.bodyConfidenceBoost;
+        breakdown.bodyConfidenceBoost = config.bodyConfidenceBoost - 1;
       }
     }
 
-    // Information Penalty
+    // Information Completeness Penalty
     const penaltyFields = ["job_group", "edu_level", "hobbies", "mbti"];
     let penaltyCount = 0;
     for (const field of penaltyFields) {
@@ -301,10 +312,34 @@ export class MatchScorerService {
       }
     }
     if (penaltyCount > 0) {
-      const penaltyMultiplier = Math.pow(0.95, penaltyCount);
+      const penaltyMultiplier = Math.pow(
+        config.penaltyPerMissingField,
+        penaltyCount,
+      );
       totalScore *= penaltyMultiplier;
       breakdown.informationPenalty = { penaltyCount, penaltyMultiplier };
     }
+
+    // Recency Boost (최근 가입자 우대)
+    if (config.enableRecencyBoost && targetUser.created_at) {
+      const daysSinceJoin = Math.floor(
+        (Date.now() - new Date(targetUser.created_at).getTime()) /
+          (1000 * 60 * 60 * 24),
+      );
+      if (daysSinceJoin <= config.recencyBoostDays) {
+        totalScore *= config.recencyBoostMultiplier;
+        breakdown.recencyBoost = {
+          daysSinceJoin,
+          multiplier: config.recencyBoostMultiplier,
+        };
+      }
+    }
+
+    // Normalize score
+    const normalizedScore = Math.max(
+      config.minTotalScore,
+      Math.min(config.maxTotalScore, totalScore),
+    );
 
     let reason = "추천 프로필";
     if (sharedBits.length > 0) {
@@ -312,10 +347,11 @@ export class MatchScorerService {
     }
 
     return {
-      totalScore: Math.min(1, totalScore),
+      totalScore: normalizedScore,
       breakdown,
       sharedBits: sharedBits.slice(0, 3),
       reason,
+      appliedConfig: experimentKey || "default",
     };
   }
 }
