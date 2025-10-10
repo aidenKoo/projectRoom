@@ -43,6 +43,8 @@ export class PhotoStorageWebhookController {
       throw new UnauthorizedException("Invalid payload");
     }
 
+    const metadata = body.record.metadata ?? {};
+
     const photo = await this.photoRepository.findOne({
       where: { objectPath },
       relations: { meta: true },
@@ -52,21 +54,27 @@ export class PhotoStorageWebhookController {
       throw new NotFoundException("Photo not found for uploaded object");
     }
 
-    const meta = photo.meta ?? (await this.photoModerationService.upsertMeta(
-      photo.userId,
-      photo,
-      {
-        width: photo.width,
-        height: photo.height,
-        bytes: photo.bytes,
-        hash: photo.meta?.hash,
+    const parsedWidth = metadata.width ? Number(metadata.width) : undefined;
+    const parsedHeight = metadata.height ? Number(metadata.height) : undefined;
+    const parsedBytes = metadata.bytes ? Number(metadata.bytes) : undefined;
+
+    const meta = photo.meta ??
+      (await this.photoModerationService.upsertMeta(photo.userId, photo, {
+        width: parsedWidth ?? photo.width ?? undefined,
+        height: parsedHeight ?? photo.height ?? undefined,
+        bytes: parsedBytes ?? photo.bytes ?? undefined,
+        hash: metadata.hash ?? photo.meta?.hash,
         source: "storage_webhook",
-      },
-    ));
+      }));
+
+    if (metadata.hash && !meta.hash) {
+      meta.hash = metadata.hash;
+      await this.photoModerationService.saveMeta(meta);
+    }
 
     await this.photoModerationService.requestAutoModeration(
       meta,
-      photo.publicUrl,
+      metadata.public_url ?? photo.publicUrl,
     );
 
     return { ok: true };

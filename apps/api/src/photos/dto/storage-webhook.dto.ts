@@ -1,4 +1,44 @@
-import { IsNotEmpty, IsOptional, IsString } from "class-validator";
+import { Type } from "class-transformer";
+import {
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  ValidateNested,
+} from "class-validator";
+
+export class StorageMetadataDto {
+  @IsOptional()
+  @IsString()
+  meta_id?: string;
+
+  @IsOptional()
+  @IsString()
+  photo_id?: string;
+
+  @IsOptional()
+  @IsString()
+  user_id?: string;
+
+  @IsOptional()
+  @IsString()
+  hash?: string;
+
+  @IsOptional()
+  @IsString()
+  width?: string;
+
+  @IsOptional()
+  @IsString()
+  height?: string;
+
+  @IsOptional()
+  @IsString()
+  bytes?: string;
+
+  @IsOptional()
+  @IsString()
+  public_url?: string;
+}
 
 export class StorageWebhookRecordDto {
   @IsString()
@@ -9,11 +49,14 @@ export class StorageWebhookRecordDto {
   @IsOptional()
   bucket?: string;
 
-  @IsString()
+  @ValidateNested()
+  @Type(() => StorageMetadataDto)
   @IsOptional()
-  metadataUid?: string;
+  metadata?: StorageMetadataDto;
 }
 
 export class StorageWebhookDto {
+  @ValidateNested()
+  @Type(() => StorageWebhookRecordDto)
   record: StorageWebhookRecordDto;
 }

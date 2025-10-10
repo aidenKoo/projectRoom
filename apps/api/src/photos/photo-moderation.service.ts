@@ -88,6 +88,10 @@ export class PhotoModerationService {
     });
   }
 
+  async saveMeta(meta: PhotoMeta): Promise<PhotoMeta> {
+    return this.photoMetaRepository.save(meta);
+  }
+
   async getModerationQueue(
     options: ModerationQueueOptions = {},
   ): Promise<{ items: PhotoMeta[]; total: number; page: number; limit: number }> {
