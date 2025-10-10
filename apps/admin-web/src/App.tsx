@@ -1,11 +1,11 @@
-
+﻿
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
 import { Layout, Menu, Spin, Button, theme as antdTheme } from 'antd';
 import { onAuthStateChanged, type User } from 'firebase/auth';
 import { auth } from './firebase.ts';
 
-import { DashboardOutlined, UserOutlined, QrcodeOutlined, UnorderedListOutlined, HistoryOutlined, DeploymentUnitOutlined } from '@ant-design/icons';
+import { DashboardOutlined, UserOutlined, QrcodeOutlined, UnorderedListOutlined, HistoryOutlined, DeploymentUnitOutlined, SafetyCertificateOutlined } from '@ant-design/icons';
 
 import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
@@ -14,6 +14,7 @@ import CodeManagement from './pages/CodeManagement';
 import OptionManagement from './pages/OptionManagement';
 import AuditLog from './pages/AuditLog';
 import MatchMonitoring from './pages/MatchMonitoring';
+import PhotoModeration from './pages/PhotoModeration';
 
 const { Header, Content, Sider } = Layout;
 
@@ -71,6 +72,9 @@ const App: React.FC = () => {
                   <Menu.Item key="/match" icon={<DeploymentUnitOutlined />}>
                     <Link to="/match">Match Queue</Link>
                   </Menu.Item>
+                  <Menu.Item key="/moderation" icon={<SafetyCertificateOutlined />}>
+                    <Link to="/moderation">Moderation</Link>
+                  </Menu.Item>
                   <Menu.Item key="/options" icon={<UnorderedListOutlined />}>
                     <Link to="/options">Options</Link>
                   </Menu.Item>
@@ -90,6 +94,7 @@ const App: React.FC = () => {
                         <Route path="/users" element={<UserManagement />} />
                         <Route path="/codes" element={<CodeManagement />} />
                         <Route path="/match" element={<MatchMonitoring />} />
+                        <Route path="/moderation" element={<PhotoModeration />} />
                         <Route path="/options" element={<OptionManagement />} />
                         <Route path="/logs" element={<AuditLog />} />
                     </Routes>

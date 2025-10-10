@@ -13,10 +13,14 @@ import { Match } from "../match/entities/match.entity";
 import { Recommendation } from "../match/entities/recommendation.entity";
 import { Message } from "../conversations/entities/message.entity";
 import { AuditLogsModule } from "../audit-logs/audit-logs.module";
+import { PhotosModule } from "../photos/photos.module";
+import { Photo } from "../photos/entities/photo.entity";
+import { PhotoMeta } from "../photos/entities/photo-meta.entity";
 
 @Module({
   imports: [
     AuditLogsModule,
+    PhotosModule,
     TypeOrmModule.forFeature([
       User,
       Profile,
@@ -28,6 +32,8 @@ import { AuditLogsModule } from "../audit-logs/audit-logs.module";
       Match,
       Recommendation,
       Message,
+      Photo,
+      PhotoMeta,
     ]),
   ],
   controllers: [AdminController],

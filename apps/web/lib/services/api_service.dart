@@ -117,6 +117,25 @@ class ApiService {
   Future<void> skipUser(String targetUid) async {
     await _dio.post('/match/skip', data: {'target_id': targetUid});
   }
+
+  Future<List<Map<String, dynamic>>> getMyPhotos() async {
+    final response = await _dio.get('/photos', queryParameters: {'me': '1'});
+    final data = response.data as List<dynamic>;
+    return data.cast<Map<String, dynamic>>();
+  }
+
+  Future<Map<String, dynamic>> createPhoto(Map<String, dynamic> data) async {
+    final response = await _dio.post('/photos', data: data);
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<void> setPrimaryPhoto(int photoId) async {
+    await _dio.patch('/photos/$photoId', data: {'isPrimary': true});
+  }
+
+  Future<void> deletePhoto(int photoId) async {
+    await _dio.delete('/photos/$photoId');
+  }
 }
 
 // Create a global instance

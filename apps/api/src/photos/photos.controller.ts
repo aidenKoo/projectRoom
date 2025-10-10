@@ -59,20 +59,16 @@ export class PhotosController {
     @Query("me") me?: string,
     @Query("userId") userId?: string,
   ) {
-    if (me === "1") {
-      const firebaseUid = req.user.uid;
-      const user = await this.usersService.findByFirebaseUid(firebaseUid);
-      return this.photosService.findByUserId(user.id);
-    }
-
-    if (userId) {
-      return this.photosService.findByUserId(parseInt(userId, 10));
-    }
-
-    // Default: return own photos
     const firebaseUid = req.user.uid;
     const user = await this.usersService.findByFirebaseUid(firebaseUid);
-    return this.photosService.findByUserId(user.id);
+
+    if (me === "1" || !userId) {
+      return this.photosService.findByUserId(user.id, {
+        includePending: true,
+      });
+    }
+
+    return this.photosService.findByUserId(parseInt(userId, 10));
   }
 
   @Patch(":id")

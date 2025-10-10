@@ -1,4 +1,4 @@
-name: projectroom_web
+﻿name: projectroom_web
 description: "A new Flutter project."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
@@ -31,19 +31,20 @@ dependencies:
   flutter:
     sdk: flutter
 
-  # Firebase (per 작업서: Auth/Storage)
+  # Firebase (per ?묒뾽?? Auth/Storage)
   firebase_core: ^3.8.1
   firebase_auth: ^5.3.3
   firebase_storage: ^12.3.8
 
-  # State Management (per 작업서: Riverpod)
+  # State Management (per ?묒뾽?? Riverpod)
   flutter_riverpod: ^2.6.1
 
-  # Routing (per 작업서: go_router)
+  # Routing (per ?묒뾽?? go_router)
   go_router: ^14.6.2
 
-  # HTTP Client (per 작업서: dio)
+  # HTTP Client (per ?묒뾽?? dio)
   dio: ^5.7.0
+  crypto: ^3.0.3
 
   # Web support
   web: ^1.1.0
@@ -69,7 +70,7 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
 
-  # Code generation (per 작업서: freezed)
+  # Code generation (per ?묒뾽?? freezed)
   build_runner: ^2.4.13
   freezed: ^2.5.7
   json_serializable: ^6.8.0

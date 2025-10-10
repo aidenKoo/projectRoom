@@ -31,6 +31,13 @@ export class CreatePhotoDto {
   bytes?: number;
 
   @ApiPropertyOptional({
+    description: "Perceptual hash or checksum for duplicate detection",
+  })
+  @IsString()
+  @IsOptional()
+  hash?: string;
+
+  @ApiPropertyOptional({
     description: "Is this the primary profile photo?",
     default: false,
   })

@@ -67,6 +67,34 @@ CREATE TABLE photos (
     INDEX idx_is_primary (user_id, is_primary)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Photo metadata table (Cloud Functions → API sync)
+CREATE TABLE photo_meta (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    photo_id BIGINT UNSIGNED NOT NULL,
+    user_id BIGINT UNSIGNED NOT NULL,
+    path VARCHAR(255) NOT NULL,
+    source VARCHAR(32) NOT NULL DEFAULT 'manual',
+    width INT,
+    height INT,
+    bytes BIGINT,
+    hash VARCHAR(64),
+    nsfw BOOLEAN DEFAULT FALSE,
+    status ENUM('pending','approved','rejected','auto_flagged') NOT NULL DEFAULT 'pending',
+    nsfw_score DECIMAL(5,4),
+    labels JSON,
+    review_notes VARCHAR(255),
+    reviewed_at DATETIME,
+    reviewed_by VARCHAR(64),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_photo_id (photo_id),
+    UNIQUE KEY uniq_user_path (user_id, path),
+    INDEX idx_photo_user (photo_id, user_id),
+    INDEX idx_status (status),
+    FOREIGN KEY (photo_id) REFERENCES photos(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Preferences table
 CREATE TABLE preferences (
     user_id BIGINT UNSIGNED PRIMARY KEY,

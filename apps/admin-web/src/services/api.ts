@@ -1,4 +1,4 @@
-
+﻿
 import axios from 'axios';
 import { auth } from '../firebase.ts';
 
@@ -70,6 +70,76 @@ export async function fetchMatchQueue(params: { userId?: string }) {
   const response = await api.get<MatchQueueResponse>('/admin/match/queue', {
     params,
   });
+  return response.data;
+}
+
+export type ModerationUserSummary = {
+  id: number;
+  uid?: string;
+  email?: string;
+  name?: string | null;
+  regionCode?: string | null;
+};
+
+export type ModerationPhotoRecord = {
+  id: number;
+  photoId: number;
+  status: 'pending' | 'approved' | 'rejected' | 'auto_flagged';
+  nsfw: boolean;
+  nsfwScore?: number | null;
+  labels: string[];
+  reviewNotes?: string | null;
+  reviewedAt?: string | null;
+  reviewedBy?: string | null;
+  createdAt: string;
+  user: ModerationUserSummary;
+  profile?: {
+    jobGroup?: string | null;
+    education?: string | null;
+  } | null;
+  photo: {
+    id?: number;
+    objectPath: string;
+    publicUrl?: string;
+    mimeType?: string | null;
+    width?: number | null;
+    height?: number | null;
+    bytes?: number | null;
+    isPrimary?: boolean;
+    createdAt?: string;
+  };
+};
+
+export async function fetchPhotoModerationQueue(status?: string[]) {
+  const params: Record<string, string> = {};
+  if (status && status.length > 0) {
+    params.status = status.join(',');
+  }
+  const response = await api.get<ModerationPhotoRecord[]>('/admin/moderation/photos', {
+    params,
+  });
+  return response.data;
+}
+
+export async function moderatePhotoDecision(
+  photoMetaId: number,
+  decision: 'approve' | 'reject',
+  auditReason: string,
+  note?: string,
+) {
+  const response = await api.post<ModerationPhotoRecord>(
+    `/admin/moderation/photos/${photoMetaId}/decision`,
+    {
+      decision,
+      note,
+    },
+    {
+      headers: {
+        'X-Audit-Reason': auditReason,
+      },
+    },
+  );
+
   return response.data;
 }
 

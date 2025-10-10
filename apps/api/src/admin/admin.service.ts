@@ -14,6 +14,11 @@ import { Message } from "../conversations/entities/message.entity";
 import * as crypto from "crypto";
 import { AuditLogsService } from "../audit-logs/audit-logs.service";
 import { AuditAction } from "../audit-logs/entities/audit-log.entity";
+import { PhotoModerationService } from "../photos/photo-moderation.service";
+import {
+  PhotoMeta,
+  PhotoModerationStatus,
+} from "../photos/entities/photo-meta.entity";
 
 interface AuditContext {
   accessorId: string;
@@ -48,6 +53,7 @@ export class AdminService {
     @InjectRepository(Message)
     private readonly messageRepository: Repository<Message>,
     private readonly auditLogsService: AuditLogsService,
+    private readonly photoModerationService: PhotoModerationService,
   ) {}
 
   // KPI 메트릭
@@ -424,6 +430,143 @@ export class AdminService {
         userId: userId ?? null,
         limit: 50,
       },
+    };
+  }
+
+  async getPhotoModerationQueue(
+    status: PhotoModerationStatus[] = [
+      PhotoModerationStatus.PENDING,
+      PhotoModerationStatus.AUTO_FLAGGED,
+    ],
+  ) {
+    const queue = await this.photoModerationService.getModerationQueue(status);
+    if (queue.length === 0) {
+      return [];
+    }
+
+    const userIds = Array.from(new Set(queue.map((meta) => meta.userId)));
+    const users = await this.userRepository.find({
+      where: { id: In(userIds) },
+    });
+    const profiles = await this.profileRepository.find({
+      where: { user_id: In(userIds) },
+    });
+
+    const userMap = new Map(users.map((user) => [user.id, user]));
+    const profileMap = new Map(
+      profiles.map((profile) => [profile.user_id, profile]),
+    );
+
+    return queue.map((meta) =>
+      this.serializePhotoMeta(
+        meta,
+        userMap.get(meta.userId),
+        profileMap.get(meta.userId),
+      ),
+    );
+  }
+
+  async moderatePhoto(
+    metaId: number,
+    decision: PhotoModerationStatus.APPROVED | PhotoModerationStatus.REJECTED,
+    auditContext: AuditContext,
+    notes?: string,
+  ) {
+    const meta = await this.photoModerationService.getMetaById(metaId);
+    if (!meta) {
+      throw new NotFoundException("Photo moderation record not found");
+    }
+
+    await this.photoModerationService.applyDecision(
+      meta,
+      decision,
+      auditContext.accessorId,
+      notes,
+      meta.labels ?? undefined,
+    );
+
+    const updated = await this.photoModerationService.getMetaById(metaId);
+    if (!updated) {
+      throw new NotFoundException("Photo moderation record not found");
+    }
+
+    const ownerUser = updated.photo?.user ?? null;
+    const ownerProfile = ownerUser
+      ? await this.profileRepository.findOne({
+          where: { user_id: ownerUser.id },
+        })
+      : null;
+
+    await this.auditLogsService.createLog({
+      accessorId: auditContext.accessorId,
+      targetUserId: ownerUser?.firebase_uid ?? String(updated.userId),
+      action: auditContext.action,
+      reason: auditContext.reason,
+      targetResource: `admin.moderation.photo.${decision}`,
+      ip: auditContext.ip,
+      requestId: auditContext.requestId,
+      details: {
+        photoId: updated.photoId,
+        status: updated.status,
+        reviewer: auditContext.accessorId,
+        notes: notes ?? null,
+      },
+    });
+
+    return this.serializePhotoMeta(updated, ownerUser ?? undefined, ownerProfile ?? undefined);
+  }
+
+  private serializePhotoMeta(
+    meta: PhotoMeta,
+    user?: User,
+    profile?: Profile,
+  ) {
+    const photo = meta.photo;
+    const createdAt = photo?.createdAt ?? meta.createdAt;
+
+    return {
+      id: meta.id,
+      photoId: meta.photoId,
+      status: meta.status,
+      nsfw: meta.nsfw,
+      nsfwScore: meta.nsfwScore,
+      labels: meta.labels ?? [],
+      reviewNotes: meta.reviewNotes ?? null,
+      reviewedAt: meta.reviewedAt ?? null,
+      reviewedBy: meta.reviewedBy ?? null,
+      createdAt,
+      user: user
+        ? {
+            id: user.id,
+            uid: user.firebase_uid,
+            email: user.email,
+            name: user.display_name ?? null,
+            regionCode: user.region_code ?? null,
+          }
+        : {
+            id: meta.userId,
+          },
+      profile: profile
+        ? {
+            jobGroup: profile.job_group ?? null,
+            education: profile.edu_level ?? null,
+          }
+        : null,
+      photo: photo
+        ? {
+            id: photo.id,
+            objectPath: photo.objectPath,
+            publicUrl: photo.publicUrl,
+            mimeType: photo.mimeType,
+            width: meta.width ?? photo.width ?? null,
+            height: meta.height ?? photo.height ?? null,
+            bytes: meta.bytes ?? photo.bytes ?? null,
+            isPrimary: photo.isPrimary,
+            createdAt: photo.createdAt,
+          }
+        : {
+            objectPath: meta.path,
+          },
     };
   }
 }

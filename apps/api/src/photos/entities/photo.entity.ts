@@ -6,8 +6,10 @@ import {
   JoinColumn,
   CreateDateColumn,
   Index,
+  OneToOne,
 } from "typeorm";
 import { User } from "../../users/entities/user.entity";
+import { PhotoMeta } from "./photo-meta.entity";
 
 @Entity("photos")
 @Index("idx_user_id", ["userId"])
@@ -46,4 +48,9 @@ export class Photo {
   @ManyToOne(() => User, { onDelete: "CASCADE" })
   @JoinColumn({ name: "user_id" })
   user: User;
+
+  @OneToOne(() => PhotoMeta, (meta) => meta.photo, {
+    cascade: true,
+  })
+  meta?: PhotoMeta;
 }

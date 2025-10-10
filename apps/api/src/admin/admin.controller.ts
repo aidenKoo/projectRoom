@@ -1,4 +1,5 @@
 import {
+  Body,
   Controller,
   Get,
   Post,
@@ -15,6 +16,8 @@ import { FirebaseAuthGuard } from "../common/guards/firebase-auth.guard";
 import { AdminGuard } from "../common/guards/admin.guard";
 import { AuditAction } from "../audit-logs/entities/audit-log.entity";
 import { extractRequestContext } from "../common/utils/request-context.util";
+import { ModeratePhotoDto, PhotoModerationDecision } from "./dto/moderate-photo.dto";
+import { PhotoModerationStatus } from "../photos/entities/photo-meta.entity";
 
 @Controller("admin")
 @UseGuards(FirebaseAuthGuard, AdminGuard)
@@ -114,5 +117,62 @@ export class AdminController {
   @Get("match/queue")
   async getMatchQueue(@Query("userId") userId?: string) {
     return this.adminService.getMatchQueue(userId);
+  }
+
+  @Get("moderation/photos")
+  async getPhotoModerationQueue(@Query("status") status?: string) {
+    const allowedStatuses = Object.values(PhotoModerationStatus);
+    const parsedStatuses = status
+      ?.split(",")
+      .map((value) => value.trim())
+      .filter((value) =>
+        allowedStatuses.includes(value as PhotoModerationStatus),
+      ) as PhotoModerationStatus[] | undefined;
+
+    const statuses =
+      parsedStatuses && parsedStatuses.length > 0 ? parsedStatuses : undefined;
+
+    return this.adminService.getPhotoModerationQueue(statuses);
+  }
+
+  @Post("moderation/photos/:id/decision")
+  async moderatePhoto(
+    @Param("id", ParseIntPipe) id: number,
+    @Body() body: ModeratePhotoDto,
+    @Req() req: any,
+    @Headers("x-audit-reason") auditReason?: string,
+  ) {
+    const accessorId = req.user?.uid;
+    if (!accessorId) {
+      throw new BadRequestException("���� ������ �����ϴ�.");
+    }
+
+    const reason = auditReason?.trim();
+    if (!reason) {
+      throw new BadRequestException(
+        "�ΰ��� ���� �۾� �� X-Audit-Reason ����� �ʿ��մϴ�.",
+      );
+    }
+
+    const { ip, requestId, userAgent } = extractRequestContext(req);
+
+    const decision =
+      body.decision === PhotoModerationDecision.APPROVE
+        ? PhotoModerationStatus.APPROVED
+        : PhotoModerationStatus.REJECTED;
+
+    return this.adminService.moderatePhoto(
+      id,
+      decision,
+      {
+        accessorId,
+        reason,
+        action: AuditAction.UPDATE_SENSITIVE_DATA,
+        ip,
+        requestId,
+        userAgent,
+      },
+      body.note,
+    );
   }
 }
