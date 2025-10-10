@@ -8,6 +8,7 @@ import {
   Form,
   Image,
   Input,
+  List,
   Modal,
   Row,
   Select,
@@ -22,10 +23,12 @@ import type { ColumnsType } from 'antd/es/table';
 import type { TablePaginationConfig } from 'antd/es/table';
 import dayjs, { Dayjs } from 'dayjs';
 import {
+  fetchAuditLogs,
   fetchPhotoModerationQueue,
   moderatePhotoDecision,
 } from '../services/api';
 import type {
+  AuditLogEntry,
   ModerationPhotoRecord,
   ModerationPhotoResponse,
 } from '../services/api';
@@ -98,6 +101,21 @@ const getSummary = (records: ModerationPhotoRecord[]): ModerationSummary => {
   );
 };
 
+const renderDetailValue = (value: unknown): string => {
+  if (value === null || value === undefined) return '';
+  if (Array.isArray(value)) {
+    return value.map((item) => renderDetailValue(item)).join(', ');
+  }
+  if (typeof value === 'object') {
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return String(value);
+    }
+  }
+  return String(value);
+};
+
 const PhotoModeration: React.FC = () => {
   const [records, setRecords] = useState<ModerationPhotoRecord[]>([]);
   const [summary, setSummary] = useState<ModerationSummary>({
@@ -127,6 +145,8 @@ const PhotoModeration: React.FC = () => {
   const [selectedPhoto, setSelectedPhoto] = useState<ModerationPhotoRecord | null>(null);
   const [decision, setDecision] = useState<'approve' | 'reject'>('approve');
   const [submitting, setSubmitting] = useState(false);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
   const [form] = Form.useForm<{ auditReason: string; note?: string }>();
 
   const loadPhotos = useCallback(
@@ -212,6 +232,8 @@ const PhotoModeration: React.FC = () => {
     setSelectedPhoto(record);
     setDecision(nextDecision);
     setModalVisible(true);
+    setAuditLogs([]);
+    setAuditLoading(true);
     form.resetFields();
   };
 
@@ -238,6 +260,38 @@ const PhotoModeration: React.FC = () => {
       setSubmitting(false);
     }
   };
+
+  useEffect(() => {
+    const fetchAuditTrail = async () => {
+      if (!modalVisible || !selectedPhoto?.user?.uid) {
+        setAuditLogs([]);
+        setAuditLoading(false);
+        return;
+      }
+
+      try {
+        setAuditLoading(true);
+        const response = await fetchAuditLogs({
+          action: 'UPDATE_SENSITIVE_DATA',
+          targetUid: selectedPhoto.user.uid,
+          limit: 20,
+        });
+        const filtered = response.items.filter((entry) => {
+          if (!entry.details) return false;
+          const photoId = entry.details.photoId ?? entry.details.photo_id;
+          return Number(photoId) === selectedPhoto.photoId;
+        });
+        setAuditLogs(filtered);
+      } catch (err) {
+        message.error(`Failed to load audit trail: ${String(err)}`);
+        setAuditLogs([]);
+      } finally {
+        setAuditLoading(false);
+      }
+    };
+
+    fetchAuditTrail();
+  }, [modalVisible, selectedPhoto, message]);
 
   const columns: ColumnsType<ModerationPhotoRecord> = useMemo(() => {
     return [
@@ -449,6 +503,37 @@ const PhotoModeration: React.FC = () => {
                 <Input.TextArea rows={3} maxLength={255} placeholder="Optional notes (visible to admin team)." />
               </Form.Item>
             </Form>
+            <Card size="small" title="Audit Trail" bordered={false}>
+              {auditLoading ? (
+                <Text type="secondary">Loading audit history…</Text>
+              ) : auditLogs.length > 0 ? (
+                <List
+                  size="small"
+                  dataSource={auditLogs}
+                  renderItem={(item) => {
+                    const details = (item.details ?? {}) as Record<string, unknown>;
+                    const notesText = details.notes ? renderDetailValue(details.notes) : '';
+                    const labelsText = Array.isArray(details.labels)
+                      ? renderDetailValue(details.labels)
+                      : '';
+
+                    return (
+                      <List.Item>
+                        <Space direction="vertical" size={0} style={{ width: '100%' }}>
+                          <Text strong>{formatDate(item.timestamp)}</Text>
+                          <Text type="secondary">Reviewer: {item.accessorId}</Text>
+                          {notesText && <Text type="secondary">Notes: {notesText}</Text>}
+                          {labelsText && <Text type="secondary">Labels: {labelsText}</Text>}
+                          <Text type="secondary">Action: {item.action}</Text>
+                        </Space>
+                      </List.Item>
+                    );
+                  }}
+                />
+              ) : (
+                <Text type="secondary">No audit entries yet.</Text>
+              )}
+            </Card>
           </Space>
         )}
       </Modal>

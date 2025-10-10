@@ -157,6 +157,40 @@ export async function fetchPhotoModerationQueue(params?: {
   return response.data;
 }
 
+export type AuditLogEntry = {
+  id: string;
+  timestamp: string;
+  accessorId: string;
+  targetUserId: string;
+  action: string;
+  details?: Record<string, unknown> | null;
+};
+
+export type AuditLogResponse = {
+  items: AuditLogEntry[];
+  meta: PaginationMeta;
+};
+
+export async function fetchAuditLogs(params?: {
+  page?: number;
+  limit?: number;
+  action?: string;
+  targetUid?: string;
+  actorUid?: string;
+}) {
+  const query: Record<string, string | number> = {};
+  if (params?.page) query.page = params.page;
+  if (params?.limit) query.limit = params.limit;
+  if (params?.action) query.action = params.action;
+  if (params?.targetUid) query.targetUid = params.targetUid;
+  if (params?.actorUid) query.actorUid = params.actorUid;
+
+  const response = await api.get<AuditLogResponse>('/audit-logs', {
+    params: query,
+  });
+  return response.data;
+}
+
 export async function moderatePhotoDecision(
   photoMetaId: number,
   decision: 'approve' | 'reject',
