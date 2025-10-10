@@ -126,6 +126,7 @@ CREATE TABLE messages (
   sender_id UUID NOT NULL REFERENCES profiles(user_id) ON DELETE CASCADE,
   body TEXT,
   type TEXT CHECK (type IN ('text', 'voice', 'image', 'icebreaker')) DEFAULT 'text',
+  image_url TEXT,
   metadata JSONB DEFAULT '{}'::JSONB,
   flagged BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMPTZ DEFAULT NOW()

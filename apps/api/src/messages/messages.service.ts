@@ -36,9 +36,9 @@ export class MessagesService {
     const message = this.messagesRepository.create({
       match_id: matchId,
       sender_id: senderId,
-      body,
+      body: type === "text" ? body.trim() : null,
       type,
-      image_url: imageUrl,
+      image_url: type === "image" ? imageUrl ?? null : null,
     });
 
     return this.messagesRepository.save(message);

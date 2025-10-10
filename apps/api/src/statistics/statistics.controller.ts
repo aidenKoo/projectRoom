@@ -14,7 +14,13 @@ import {
 import { StatisticsService } from "./statistics.service";
 import { FirebaseAuthGuard } from "../common/guards/firebase-auth.guard";
 import { AdminGuard } from "../common/guards/admin.guard";
-import { parseISO, isValid, isAfter } from "date-fns";
+const parseDateOrThrow = (value: string, label: string): Date => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    throw new BadRequestException(`${label} must be a valid ISO date`);
+  }
+  return date;
+};
 
 @ApiTags("statistics")
 @Controller("v1/statistics")
@@ -31,14 +37,10 @@ export class StatisticsController {
     @Query("startDate") startDate: string,
     @Query("endDate") endDate: string,
   ) {
-    const start = parseISO(startDate);
-    const end = parseISO(endDate);
+    const start = parseDateOrThrow(startDate, "startDate");
+    const end = parseDateOrThrow(endDate, "endDate");
 
-    if (!isValid(start) || !isValid(end)) {
-      throw new BadRequestException("startDate and endDate must be valid ISO dates");
-    }
-
-    if (isAfter(start, end)) {
+    if (start > end) {
       throw new BadRequestException("startDate cannot be after endDate");
     }
 

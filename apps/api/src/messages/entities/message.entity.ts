@@ -28,6 +28,9 @@ export class Message {
   @Column({ type: "enum", enum: ["text", "image"], default: "text" })
   type: "text" | "image";
 
+  @Column({ type: "varchar", length: 1000, nullable: true, name: "image_url" })
+  image_url?: string | null;
+
   @CreateDateColumn()
   created_at: Date;
 

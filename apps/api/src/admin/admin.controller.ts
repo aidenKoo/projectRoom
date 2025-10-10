@@ -18,7 +18,19 @@ import { AuditAction } from "../audit-logs/entities/audit-log.entity";
 import { extractRequestContext } from "../common/utils/request-context.util";
 import { ModeratePhotoDto, PhotoModerationDecision } from "./dto/moderate-photo.dto";
 import { PhotoModerationStatus } from "../photos/entities/photo-meta.entity";
-import { startOfDay, endOfDay, parseISO, isValid, isAfter } from "date-fns";
+const toDateOrThrow = (value: string, label: string): Date => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    throw new BadRequestException(`${label} must be a valid ISO date`);
+  }
+  return date;
+};
+
+const startOfDay = (date: Date): Date =>
+  new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+const endOfDay = (date: Date): Date =>
+  new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
 
 @Controller("admin")
 @UseGuards(FirebaseAuthGuard, AdminGuard)
@@ -155,22 +167,14 @@ export class AdminController {
     let dateTo: Date | undefined;
 
     if (dateFromParam) {
-      const parsed = parseISO(dateFromParam);
-      if (!isValid(parsed)) {
-        throw new BadRequestException("dateFrom must be a valid ISO date");
-      }
-      dateFrom = startOfDay(parsed);
+      dateFrom = startOfDay(toDateOrThrow(dateFromParam, "dateFrom"));
     }
 
     if (dateToParam) {
-      const parsed = parseISO(dateToParam);
-      if (!isValid(parsed)) {
-        throw new BadRequestException("dateTo must be a valid ISO date");
-      }
-      dateTo = endOfDay(parsed);
+      dateTo = endOfDay(toDateOrThrow(dateToParam, "dateTo"));
     }
 
-    if (dateFrom && dateTo && isAfter(dateFrom, dateTo)) {
+    if (dateFrom && dateTo && dateFrom > dateTo) {
       throw new BadRequestException("dateFrom cannot be after dateTo");
     }
 

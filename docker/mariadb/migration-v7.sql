@@ -86,6 +86,7 @@ CREATE TABLE messages (
   conv_id BIGINT,
   sender_uid VARCHAR(64),
   body TEXT,
+  image_url VARCHAR(1000),
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (conv_id) REFERENCES conversations(id)
 );
