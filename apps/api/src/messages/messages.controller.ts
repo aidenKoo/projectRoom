@@ -46,7 +46,7 @@ export class MessagesController {
     const limitNum = limit ? parseInt(limit, 10) : 50;
     return this.messagesService.findByMatchId(
       parseInt(matchId, 10),
-      user.uid,
+      user.id,
       limitNum,
     );
   }
@@ -63,7 +63,7 @@ export class MessagesController {
 
     return this.messagesService.create(
       parseInt(matchId, 10),
-      user.uid,
+      user.id,
       createMessageDto.body || "",
       createMessageDto.type,
     );

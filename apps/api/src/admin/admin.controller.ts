@@ -36,41 +36,41 @@ export class AdminController {
   }
 
   // 월별 코드 목록
-  @Get("codes")
-  async getCodes() {
-    return this.adminService.getCodes();
-  }
+  // @Get("codes")
+  // async getCodes() {
+  //   return this.adminService.getCodes();
+  // }
 
   // 월별 코드 수동 생성
-  @Post("codes/generate")
-  async generateCode() {
-    return this.adminService.generateMonthlyCodeManually();
-  }
+  // @Post("codes/generate")
+  // async generateCode() {
+  //   return this.adminService.generateMonthlyCodeManually();
+  // }
 
   // 추천인 통계
-  @Get("referrals/stats")
-  async getReferralStats() {
-    return this.adminService.getReferralStats();
-  }
+  // @Get("referrals/stats")
+  // async getReferralStats() {
+  //   return this.adminService.getReferralStats();
+  // }
 
   // 매칭 큐 모니터 (추천 디버깅)
-  @Get("match/queue")
-  async getMatchQueue(@Query("userId") userId: string) {
-    return this.adminService.getMatchQueue(userId);
-  }
+  // @Get("match/queue")
+  // async getMatchQueue(@Query("userId") userId: string) {
+  //   return this.adminService.getMatchQueue(userId);
+  // }
 
   // 사진 목록 (페이지네이션)
-  @Get("photos")
-  async getPhotos(
-    @Query("page", new ParseIntPipe({ optional: true })) page = 1,
-    @Query("limit", new ParseIntPipe({ optional: true })) limit = 20,
-  ) {
-    return this.adminService.getPhotos(page, limit);
-  }
+  // @Get("photos")
+  // async getPhotos(
+  //   @Query("page", new ParseIntPipe({ optional: true })) page = 1,
+  //   @Query("limit", new ParseIntPipe({ optional: true })) limit = 20,
+  // ) {
+  //   return this.adminService.getPhotos(page, limit);
+  // }
 
   // A/B 테스트 목록
-  @Get("ab-tests")
-  async getABTests() {
-    return this.adminService.getABTests();
-  }
+  // @Get("ab-tests")
+  // async getABTests() {
+  //   return this.adminService.getABTests();
+  // }
 }

@@ -1,3 +1,5 @@
+import { Entity, PrimaryGeneratedColumn, Column, Index, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+
 @Entity("users")
 export class User {
   @PrimaryGeneratedColumn({ type: "bigint", unsigned: true })
@@ -9,6 +11,9 @@ export class User {
 
   @Column({ length: 255, unique: true })
   email: string;
+
+  @Column({ type: 'int', nullable: true, comment: '출생년도' })
+  birth_year: number;
 
   @Column({
     type: 'timestamp',

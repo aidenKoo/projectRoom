@@ -44,7 +44,7 @@ export class ProfilesPrivateController {
   async upsert(@Request() req, @Body() createDto: CreateProfilePrivateDto) {
     const firebaseUid = req.user.uid;
     const user = await this.usersService.findByUid(firebaseUid);
-    return this.profilesPrivateService.upsert(user.uid, createDto);
+    return this.profilesPrivateService.upsert(user.id, createDto);
   }
 
   @Get("me")
@@ -60,7 +60,7 @@ export class ProfilesPrivateController {
   async findMine(@Request() req) {
     const firebaseUid = req.user.uid;
     const user = await this.usersService.findByUid(firebaseUid);
-    const profile = await this.profilesPrivateService.findByUserId(user.uid);
+    const profile = await this.profilesPrivateService.findByUserId(user.id);
 
     if (!profile) {
       return { message: "비공개 프로필이 없습니다." };
@@ -74,7 +74,7 @@ export class ProfilesPrivateController {
   async update(@Request() req, @Body() updateDto: UpdateProfilePrivateDto) {
     const firebaseUid = req.user.uid;
     const user = await this.usersService.findByUid(firebaseUid);
-    return this.profilesPrivateService.update(user.uid, updateDto);
+    return this.profilesPrivateService.update(user.id, updateDto);
   }
 
   @Delete()
@@ -82,7 +82,7 @@ export class ProfilesPrivateController {
   async remove(@Request() req) {
     const firebaseUid = req.user.uid;
     const user = await this.usersService.findByUid(firebaseUid);
-    await this.profilesPrivateService.remove(user.uid);
+    await this.profilesPrivateService.remove(user.id);
     return { message: "비공개 프로필이 삭제되었습니다." };
   }
 }

@@ -40,14 +40,14 @@ export class AdminService {
     private readonly messageRepository: Repository<Message>,
     @InjectRepository(PhotoMeta)
     private readonly photoMetaRepository: Repository<PhotoMeta>,
-    @InjectRepository(ABExperiment)
-    private readonly abExperimentRepository: Repository<ABExperiment>,
+    // @InjectRepository(ABExperiment)
+    // private readonly abExperimentRepository: Repository<ABExperiment>,
   ) {}
 
   // A/B 테스트 목록 조회
-  async getABTests() {
-    return this.abExperimentRepository.find();
-  }
+  // async getABTests() {
+  //   return this.abExperimentRepository.find();
+  // }
 
   // KPI 메트릭
   async getMetrics() {
@@ -111,13 +111,13 @@ export class AdminService {
     }
 
     const profile = await this.profileRepository.findOne({
-      where: { user_id: user.uid },
+      where: { user_id: user.id },
     });
     const profilePrivate = await this.profilePrivateRepository.findOne({
-      where: { userId: user.uid },
+      where: { userId: user.id },
     });
     const preference = await this.preferenceRepository.findOne({
-      where: { userId: user.uid },
+      where: { userId: user.id },
     });
 
     return {

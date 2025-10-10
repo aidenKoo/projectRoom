@@ -27,7 +27,7 @@ export class SwipesController {
   @ApiOperation({ summary: "Create a swipe (like/pass/superlike)" })
   async create(@Request() req, @Body() createSwipeDto: CreateSwipeDto) {
     const firebaseUid = req.user.uid;
-    const user = await this.usersService.findByFirebaseUid(firebaseUid);
+    const user = await this.usersService.findByUid(firebaseUid);
 
     return this.swipesService.create(
       user.id,

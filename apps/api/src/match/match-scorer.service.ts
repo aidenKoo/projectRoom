@@ -61,16 +61,39 @@ const calculateJaccardSimilarity = (setA: any[], setB: any[]): number => {
     return intersection.size / union.size;
 }
 
-const calculateMbtiSimilarity = (myMbti: string, targetMbti: string): number => {
-    if (!myMbti || !targetMbti) return 0.5; // Neutral score if undefined
-    let matchingLetters = 0;
-    for (let i = 0; i < 4; i++) {
-        if (myMbti[i] === targetMbti[i]) {
-            matchingLetters++;
-        }
+const goldenPairs: { [key: string]: string[] } = {
+  'INFJ': ['ENFP', 'ENTP'],
+  'ENFP': ['INFJ', 'INTJ'],
+  'INFP': ['ENFJ', 'ENTJ'],
+  'ENFJ': ['INFP', 'ISFP'],
+  'INTJ': ['ENFP', 'ENTP'],
+  'ENTJ': ['INFP', 'INTP'],
+  'INTP': ['ENTJ', 'ESTJ'],
+  'ISFJ': ['ESFP', 'ESTP'],
+  'ESFP': ['ISFJ', 'ISTJ'],
+  'ISTJ': ['ESFP', 'ENFP'],
+  'ESTP': ['ISFJ', 'ISTP'],
+  'ISFP': ['ENFJ', 'ESFJ', 'ESTJ'],
+  'ESFJ': ['ISFP', 'ISTP'],
+  'ISTP': ['ESFJ', 'ESTJ'],
+  'ESTJ': ['INTP', 'ISFP', 'ISTP'],
+};
+
+const calculateMbtiSimilarity = (mbti1: string, mbti2: string): number => {
+  if (!mbti1 || !mbti2) return 0.5; // Neutral score if undefined
+
+  if (goldenPairs[mbti1]?.includes(mbti2) || goldenPairs[mbti2]?.includes(mbti1)) {
+    return 1.0;
+  }
+
+  // Simple matching letters as a fallback
+  let matchingLetters = 0;
+  for (let i = 0; i < 4; i++) {
+    if (mbti1[i] === mbti2[i]) {
+      matchingLetters++;
     }
-    // Simple linear scale: 0 matches -> 0.2, 4 matches -> 1.0
-    return 0.2 + (matchingLetters / 4) * 0.8;
+  }
+  return 0.2 + (matchingLetters / 4) * 0.6; // Lowered the max score for simple matching
 }
 
 @Injectable()
@@ -100,7 +123,7 @@ export class MatchScorerService {
     const myUser = await this.userRepository.findOneBy({ uid: userId });
     if (!myUser) return [];
 
-    const myProfile = await this.profileRepository.findOneBy({ user_id: myUser.uid });
+    const myProfile = await this.profileRepository.findOneBy({ user_id: myUser.id });
     if (!myProfile || !myProfile.latitude || !myProfile.longitude) return [];
 
     const likedUserIds = (
@@ -139,6 +162,11 @@ export class MatchScorerService {
       .andWhere(`ST_Distance_Sphere(point(profile.longitude, profile.latitude), point(:myLon, :myLat)) <= 50000`, {
           myLon: myProfile.longitude,
           myLat: myProfile.latitude,
+      })
+      // Hard Filter 2: Age
+      .andWhere('user.birth_year BETWEEN :minBirthYear AND :maxBirthYear', {
+        minBirthYear: myUser.birth_year - 10,
+        maxBirthYear: myUser.birth_year + 10,
       });
 
     // TODO: Add hard filters for age, etc. based on legal requirements if any
@@ -161,10 +189,10 @@ export class MatchScorerService {
     }
 
     const [myProfile, targetProfile, myPreference, targetProfilePrivate, reciprocityLike] = await Promise.all([
-      this.profileRepository.findOneBy({ user_id: myUser.uid }),
-      this.profileRepository.findOneBy({ user_id: targetUser.uid }),
-      this.preferenceRepository.findOneBy({ userId: myUser.uid }),
-      this.profilePrivateRepository.findOneBy({ userId: targetUser.uid }),
+      this.profileRepository.findOneBy({ user_id: myUser.id }),
+      this.profileRepository.findOneBy({ user_id: targetUser.id }),
+      this.preferenceRepository.findOneBy({ userId: myUser.id }),
+      this.profilePrivateRepository.findOneBy({ userId: targetUser.id }),
       this.likeRepository.findOneBy({ fromUserId: targetUserId, toUserId: userId }), // Check for reciprocity
     ]);
 
@@ -270,9 +298,17 @@ export class MatchScorerService {
     preferenceScore += confidenceBoost;
     breakdown.confidenceBoost = confidenceBoost;
     
-    // TODO: Implement Information Penalty
+    let informationPenalty = 0;
+    if (!targetProfile.bio_highlight || targetProfile.bio_highlight.length < 20) {
+      informationPenalty += 0.05;
+    }
+    if (!targetProfile.hobbies || targetProfile.hobbies.length < 3) {
+      informationPenalty += 0.05;
+    }
+    preferenceScore -= informationPenalty;
+    breakdown.informationPenalty = informationPenalty;
 
-    preferenceScore = Math.min(1, preferenceScore); // Cap the score at 1
+    preferenceScore = Math.max(0, preferenceScore); // Ensure score is not negative
     breakdown.finalPreferenceScore = preferenceScore;
 
     // 4. Calculate System Score (Homophily, Activity, Quality)
@@ -304,8 +340,17 @@ export class MatchScorerService {
     breakdown.reciprocityBoost = reciprocityBoost;
 
     // 6. Combine Scores using Extended Formula
-    const BETA_PREFERENCE = 0.8;
-    const SYSTEM_SCORE_WEIGHT = 0.2;
+    let BETA_PREFERENCE = 0.8;
+    let SYSTEM_SCORE_WEIGHT = 0.2;
+
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    if (myUser.created_at > sevenDaysAgo) {
+      // Cold start for new users: rely more on system score
+      BETA_PREFERENCE = 0.6;
+      SYSTEM_SCORE_WEIGHT = 0.4;
+      breakdown.coldStart = true;
+    }
 
     const finalScore = 
         BETA_PREFERENCE * preferenceScore +

@@ -38,7 +38,7 @@ export class ReferralsController {
     const firebaseUid = req.user.uid;
     const user = await this.usersService.findByUid(firebaseUid);
     return this.referralsService.create(
-      user.uid,
+      user.id,
       createReferralDto.referrerName,
     );
   }
@@ -48,7 +48,7 @@ export class ReferralsController {
   async findMine(@Request() req) {
     const firebaseUid = req.user.uid;
     const user = await this.usersService.findByUid(firebaseUid);
-    return this.referralsService.findByUserId(user.uid);
+    return this.referralsService.findByUserId(user.id);
   }
 
   @Get("stats")

@@ -29,6 +29,6 @@ export class UsersController {
   @ApiOperation({ summary: "Get current user info" })
   async getMe(@Request() req) {
     const firebaseUid = req.user.uid;
-    return this.usersService.findByFirebaseUid(firebaseUid);
+    return this.usersService.findByUid(firebaseUid);
   }
 }

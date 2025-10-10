@@ -63,6 +63,12 @@ export class Profile {
   @Column({ type: 'float', nullable: true, default: 0, comment: '평균 사진 품질 점수' })
   avg_photo_quality: number;
 
+  @Column({ length: 100, nullable: true, comment: '지역 코드' })
+  region_code: string;
+
+  @Column({ type: 'text', nullable: true, comment: '자기소개 하이라이트' })
+  bio_highlight: string;
+
   @CreateDateColumn()
   created_at: Date;
 

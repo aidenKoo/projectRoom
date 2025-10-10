@@ -6,6 +6,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { resize } from "https://deno.land/x/image@v0.1.1/mod.ts";
+import { getImageInfo } from "jsr:@retraigo/image-size";
+import { crypto } from "jsr:@std/crypto";
+import { encodeHex } from "jsr:@std/encoding/hex";
 
 const THUMBNAIL_WIDTH = 200;
 const THUMBNAIL_HEIGHT = 200;
@@ -59,15 +62,22 @@ serve(async (req) => {
     }
     console.log("Successfully downloaded original image.");
 
-    // 2. Resize the image to create a thumbnail
     const imageBuffer = await originalImage.arrayBuffer();
-    const resizedImage = await resize(new Uint8Array(imageBuffer), {
+    const imageBytes = new Uint8Array(imageBuffer);
+
+    // 2. Get image dimensions and hash
+    const imageInfo = getImageInfo(imageBytes);
+    const hashBuffer = await crypto.subtle.digest("SHA-256", imageBytes);
+    const sha256Hash = encodeHex(hashBuffer);
+
+    // 3. Resize the image to create a thumbnail
+    const resizedImage = await resize(imageBytes, {
       width: THUMBNAIL_WIDTH,
       height: THUMBNAIL_HEIGHT,
     });
     console.log(`Successfully resized image to ${THUMBNAIL_WIDTH}x${THUMBNAIL_HEIGHT}.`);
 
-    // 3. Upload the thumbnail back to the same bucket but in a 'thumbnails' folder
+    // 4. Upload the thumbnail back to the same bucket but in a 'thumbnails' folder
     const thumbnailPath = `thumbnails/${imagePath}`;
     const { error: uploadError } = await supabaseAdmin.storage
       .from(bucketId)
@@ -81,7 +91,7 @@ serve(async (req) => {
     }
     console.log(`Successfully uploaded thumbnail to: ${thumbnailPath}`);
 
-    // 4. Update the photo_meta table
+    // 5. Update the photo_meta table
     try {
       const pathParts = imagePath.split('/');
       if (pathParts.length < 2) {
@@ -93,8 +103,9 @@ serve(async (req) => {
       const { error: insertError } = await supabaseAdmin.from('photo_meta').insert({
         uid: uid,
         path: publicUrlData.publicUrl,
-        // width and height would require a more advanced image processing library
-        // hash would require a hashing library
+        width: imageInfo?.width,
+        height: imageInfo?.height,
+        hash: sha256Hash,
       });
 
       if (insertError) {

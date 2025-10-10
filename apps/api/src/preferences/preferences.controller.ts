@@ -33,7 +33,7 @@ export class PreferencesController {
   ) {
     const firebaseUid = req.user.uid;
     const user = await this.usersService.findByUid(firebaseUid);
-    return this.preferencesService.upsert(user.uid, createPreferenceDto);
+    return this.preferencesService.upsert(user.id, createPreferenceDto);
   }
 
   @Get()
@@ -41,7 +41,7 @@ export class PreferencesController {
   async findMine(@Request() req) {
     const firebaseUid = req.user.uid;
     const user = await this.usersService.findByUid(firebaseUid);
-    return this.preferencesService.findByUserId(user.uid);
+    return this.preferencesService.findByUserId(user.id);
   }
 
   @Patch()
@@ -52,7 +52,7 @@ export class PreferencesController {
   ) {
     const firebaseUid = req.user.uid;
     const user = await this.usersService.findByUid(firebaseUid);
-    return this.preferencesService.update(user.uid, updatePreferenceDto);
+    return this.preferencesService.update(user.id, updatePreferenceDto);
   }
 
   @Delete()
@@ -60,7 +60,7 @@ export class PreferencesController {
   async remove(@Request() req) {
     const firebaseUid = req.user.uid;
     const user = await this.usersService.findByUid(firebaseUid);
-    await this.preferencesService.remove(user.uid);
+    await this.preferencesService.remove(user.id);
     return { message: "Preferences deleted successfully" };
   }
 }

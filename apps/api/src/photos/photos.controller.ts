@@ -39,7 +39,7 @@ export class PhotosController {
   async create(@Request() req, @Body() createPhotoDto: CreatePhotoDto) {
     const firebaseUid = req.user.uid;
     const user = await this.usersService.findByUid(firebaseUid);
-    return this.photosService.create(user.uid, createPhotoDto);
+    user.id
   }
 
   @Get()
@@ -62,7 +62,7 @@ export class PhotosController {
     if (me === "1") {
       const firebaseUid = req.user.uid;
       const user = await this.usersService.findByUid(firebaseUid);
-      return this.photosService.findByUserId(user.uid);
+      return this.photosService.findByUserId(user.id);
     }
 
     if (userId) {
@@ -72,7 +72,7 @@ export class PhotosController {
     // Default: return own photos
     const firebaseUid = req.user.uid;
     const user = await this.usersService.findByUid(firebaseUid);
-    return this.photosService.findByUserId(user.uid);
+    return this.photosService.findByUserId(user.id);
   }
 
   @Patch(":id")
@@ -84,7 +84,7 @@ export class PhotosController {
   ) {
     const firebaseUid = req.user.uid;
     const user = await this.usersService.findByUid(firebaseUid);
-    return this.photosService.update(parseInt(id, 10), user.uid, updatePhotoDto);
+    return this.photosService.update(parseInt(id, 10), user.id, updatePhotoDto);
   }
 
   @Delete(":id")
@@ -92,7 +92,7 @@ export class PhotosController {
   async remove(@Request() req, @Param("id") id: string) {
     const firebaseUid = req.user.uid;
     const user = await this.usersService.findByUid(firebaseUid);
-    await this.photosService.remove(parseInt(id, 10), user.uid);
+    await this.photosService.remove(parseInt(id, 10), user.id);
     return { message: "Photo deleted successfully" };
   }
 }
