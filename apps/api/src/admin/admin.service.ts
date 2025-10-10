@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
+import { In, Repository } from "typeorm";
 import { User } from "../users/entities/user.entity";
 import { Profile } from "../profiles/entities/profile.entity";
 import { ProfilePrivate } from "../profiles-private/entities/profile-private.entity";
@@ -248,11 +248,182 @@ export class AdminService {
   }
 
   // 매칭 큐 모니터
-  async getMatchQueue(userId: string) {
-    return this.recommendationRepository.find({
-      where: { userId },
-      order: { score: "DESC" },
-      take: 20,
+  async getMatchQueue(userId?: string) {
+    const query = this.recommendationRepository
+      .createQueryBuilder("rec")
+      .orderBy("rec.score", "DESC")
+      .take(50);
+
+    if (userId) {
+      query.where("rec.userId = :userId", { userId });
+    }
+
+    const recommendations = await query.getMany();
+    const now = new Date();
+
+    const allRelevantUserIds = new Set<string>();
+    recommendations.forEach((rec) => {
+      allRelevantUserIds.add(rec.userId);
+      allRelevantUserIds.add(rec.targetUserId);
     });
+
+    const users = allRelevantUserIds.size
+      ? await this.userRepository.find({
+          where: {
+            firebase_uid: In(Array.from(allRelevantUserIds)),
+          },
+        })
+      : [];
+    const usersByUid = new Map(users.map((user) => [user.firebase_uid, user]));
+
+    const profileUserIds = users
+      .map((user) => user.id)
+      .filter((id) => typeof id === "number");
+
+    const profiles = profileUserIds.length
+      ? await this.profileRepository.find({
+          where: { user_id: In(profileUserIds) },
+        })
+      : [];
+    const profilesByUserId = new Map(
+      profiles.map((profile) => [profile.user_id, profile]),
+    );
+
+    const waitTimes: number[] = [];
+    const staleThresholdMinutes = 72 * 60;
+    let queuedCount = 0;
+    let shownCount = 0;
+    let skippedCount = 0;
+    let staleCount = 0;
+    let scoreSum = 0;
+
+    const toMinuteDiff = (start: Date, end: Date) =>
+      Math.max(0, Math.round((end.getTime() - start.getTime()) / 60000));
+
+    const buildProfileSummary = (user?: User, profile?: Profile) => {
+      if (!user) {
+        return null;
+      }
+      const currentYear = now.getFullYear();
+      const age = user.birth_year ? currentYear - user.birth_year : null;
+      return {
+        uid: user.firebase_uid,
+        email: user.email,
+        name: user.display_name ?? null,
+        regionCode: user.region_code ?? null,
+        age,
+        jobGroup: profile?.job_group ?? null,
+        education: profile?.edu_level ?? null,
+        hobbies: Array.isArray(profile?.hobbies) ? profile?.hobbies : null,
+        mbti: Array.isArray(profile?.mbti) ? profile?.mbti : null,
+      };
+    };
+
+    const formatted = recommendations.map((rec) => {
+      const status = rec.isSkipped
+        ? "skipped"
+        : rec.isShown
+        ? "shown"
+        : "queued";
+
+      const waitMinutes =
+        rec.isShown && rec.shownAt
+          ? toMinuteDiff(rec.createdAt, rec.shownAt)
+          : toMinuteDiff(rec.createdAt, now);
+
+      waitTimes.push(waitMinutes);
+      const numericScore =
+        typeof rec.score === "number"
+          ? rec.score
+          : Number(rec.score ?? 0);
+      const safeScore = Number.isFinite(numericScore) ? numericScore : 0;
+      scoreSum += safeScore;
+
+      if (status === "queued") {
+        queuedCount += 1;
+        if (waitMinutes > staleThresholdMinutes) {
+          staleCount += 1;
+        }
+      } else if (status === "shown") {
+        shownCount += 1;
+      } else if (status === "skipped") {
+        skippedCount += 1;
+      }
+
+      const baseUser = usersByUid.get(rec.userId);
+      const baseProfile = baseUser
+        ? profilesByUserId.get(baseUser.id)
+        : undefined;
+      const targetUser = usersByUid.get(rec.targetUserId);
+      const targetProfile = targetUser
+        ? profilesByUserId.get(targetUser.id)
+        : undefined;
+
+      return {
+        id: rec.id,
+        userId: rec.userId,
+        targetUserId: rec.targetUserId,
+        score: safeScore,
+        scoreBreakdown: rec.scoreBreakdown ?? null,
+        sharedBits: rec.sharedBits ?? null,
+        reason: rec.reason ?? null,
+        status,
+        createdAt: rec.createdAt,
+        shownAt: rec.shownAt ?? null,
+        waitMinutes,
+        isShown: rec.isShown,
+        isSkipped: rec.isSkipped,
+        baseProfile: buildProfileSummary(baseUser, baseProfile),
+        targetProfile: buildProfileSummary(targetUser, targetProfile),
+      };
+    });
+
+    const totalCount = recommendations.length;
+    const avgScore = totalCount > 0 ? scoreSum / totalCount : 0;
+    const sortedWaits = waitTimes.slice().sort((a, b) => a - b);
+    const p95Index =
+      sortedWaits.length === 0
+        ? -1
+        : Math.min(sortedWaits.length - 1, Math.floor(sortedWaits.length * 0.95));
+    const p95WaitMinutes = p95Index >= 0 ? sortedWaits[p95Index] : 0;
+
+    const ownerUser = userId ? usersByUid.get(userId) : undefined;
+    const ownerProfile =
+      ownerUser && ownerUser.id
+        ? profilesByUserId.get(ownerUser.id)
+        : undefined;
+
+    const ownerSummary = ownerUser
+      ? {
+          uid: ownerUser.firebase_uid,
+          email: ownerUser.email,
+          name: ownerUser.display_name ?? null,
+          regionCode: ownerUser.region_code ?? null,
+          age: ownerUser.birth_year
+            ? now.getFullYear() - ownerUser.birth_year
+            : null,
+          jobGroup: ownerProfile?.job_group ?? null,
+          education: ownerProfile?.edu_level ?? null,
+        }
+      : null;
+
+    return {
+      owner: ownerSummary,
+      stats: {
+        total: totalCount,
+        queued: queuedCount,
+        shown: shownCount,
+        skipped: skippedCount,
+        stale: staleCount,
+        avgScore,
+        p95WaitMinutes,
+      },
+      recommendations: formatted,
+      retrievedAt: now.toISOString(),
+      filter: {
+        userId: userId ?? null,
+        limit: 50,
+      },
+    };
   }
 }

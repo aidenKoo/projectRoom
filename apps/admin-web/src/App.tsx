@@ -5,7 +5,7 @@ import { Layout, Menu, Spin, Button, theme as antdTheme } from 'antd';
 import { onAuthStateChanged, type User } from 'firebase/auth';
 import { auth } from './firebase.ts';
 
-import { DashboardOutlined, UserOutlined, QrcodeOutlined, UnorderedListOutlined, HistoryOutlined } from '@ant-design/icons';
+import { DashboardOutlined, UserOutlined, QrcodeOutlined, UnorderedListOutlined, HistoryOutlined, DeploymentUnitOutlined } from '@ant-design/icons';
 
 import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
@@ -13,6 +13,7 @@ import UserManagement from './pages/UserManagement';
 import CodeManagement from './pages/CodeManagement';
 import OptionManagement from './pages/OptionManagement';
 import AuditLog from './pages/AuditLog';
+import MatchMonitoring from './pages/MatchMonitoring';
 
 const { Header, Content, Sider } = Layout;
 
@@ -67,6 +68,9 @@ const App: React.FC = () => {
                   <Menu.Item key="/codes" icon={<QrcodeOutlined />}>
                     <Link to="/codes">Codes</Link>
                   </Menu.Item>
+                  <Menu.Item key="/match" icon={<DeploymentUnitOutlined />}>
+                    <Link to="/match">Match Queue</Link>
+                  </Menu.Item>
                   <Menu.Item key="/options" icon={<UnorderedListOutlined />}>
                     <Link to="/options">Options</Link>
                   </Menu.Item>
@@ -85,6 +89,7 @@ const App: React.FC = () => {
                         <Route path="/" element={<Dashboard />} />
                         <Route path="/users" element={<UserManagement />} />
                         <Route path="/codes" element={<CodeManagement />} />
+                        <Route path="/match" element={<MatchMonitoring />} />
                         <Route path="/options" element={<OptionManagement />} />
                         <Route path="/logs" element={<AuditLog />} />
                     </Routes>

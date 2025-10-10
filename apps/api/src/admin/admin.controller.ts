@@ -112,7 +112,7 @@ export class AdminController {
 
   // 매칭 큐 모니터 (추천 디버깅)
   @Get("match/queue")
-  async getMatchQueue(@Query("userId") userId: string) {
+  async getMatchQueue(@Query("userId") userId?: string) {
     return this.adminService.getMatchQueue(userId);
   }
 }
