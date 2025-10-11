@@ -24,11 +24,11 @@ export class Like {
   toUserId: string;
 
   @ManyToOne(() => User)
-  @JoinColumn({ name: "from_uid" })
+  @JoinColumn({ name: "from_uid", referencedColumnName: "uid" })
   fromUser: User;
 
   @ManyToOne(() => User)
-  @JoinColumn({ name: "to_uid" })
+  @JoinColumn({ name: "to_uid", referencedColumnName: "uid" })
   toUser: User;
 
   @CreateDateColumn({ name: "created_at" })

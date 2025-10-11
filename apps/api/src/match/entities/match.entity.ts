@@ -22,11 +22,11 @@ export class Match {
   uidB: string;
 
   @ManyToOne(() => User)
-  @JoinColumn({ name: "uid_a" })
+  @JoinColumn({ name: "uid_a", referencedColumnName: "uid" })
   userA: User;
 
   @ManyToOne(() => User)
-  @JoinColumn({ name: "uid_b" })
+  @JoinColumn({ name: "uid_b", referencedColumnName: "uid" })
   userB: User;
 
   @CreateDateColumn({ name: "created_at" })

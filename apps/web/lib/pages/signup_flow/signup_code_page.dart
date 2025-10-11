@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -17,7 +18,9 @@ class _SignupCodePageState extends ConsumerState<SignupCodePage> {
   String? _errorMessage;
 
   Future<void> _validateCode() async {
-    if (_codeController.text.isEmpty) {
+    final code = _codeController.text.trim().toUpperCase();
+
+    if (code.isEmpty) {
       setState(() => _errorMessage = '가입코드를 입력해주세요');
       return;
     }
@@ -30,8 +33,15 @@ class _SignupCodePageState extends ConsumerState<SignupCodePage> {
     try {
       final apiService = ref.read(apiServiceProvider);
       final response = await apiService.post('/codes/validate', {
-        'code': _codeController.text.trim(),
+        'code': code,
       });
+      
+      if (_codeController.text != code) {
+        _codeController.value = _codeController.value.copyWith(
+          text: code,
+          selection: TextSelection.collapsed(offset: code.length),
+        );
+      }
 
       if (response['valid'] == true) {
         // 코드 유효 → 다음 단계로

@@ -84,8 +84,10 @@ class ApiService {
 
   // Monthly Code Validation (§3.1, §8.3)
   Future<Map<String, dynamic>> validateMonthlyCode(String code) async {
+    final normalizedCode = code.trim().toUpperCase();
     try {
-      final response = await _dio.post('/codes/validate', data: {'code': code});
+      // Use absolute path since codes endpoint is not under /v1
+      final response = await _dio.post('/codes/validate', data: {'code': normalizedCode});
       return {
         'valid': response.data['valid'] ?? true,
         'month': response.data['month'],

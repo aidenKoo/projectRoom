@@ -65,8 +65,13 @@ export class CodesService {
    * 가입코드 검증 및 사용 카운트 증가
    */
   async validateAndUseCode(
-    code: string,
+    rawCode: string,
   ): Promise<{ valid: boolean; message?: string; codeData?: MonthlyCode }> {
+    const code = rawCode.trim().toUpperCase();
+
+    if (!code) {
+      return { valid: false, message: "코드를 입력해주세요." };
+    }
     const monthlyCode = await this.monthlyCodeRepository.findOne({
       where: { code },
     });

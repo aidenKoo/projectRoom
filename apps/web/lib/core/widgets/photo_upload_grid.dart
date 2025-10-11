@@ -76,9 +76,15 @@ class _PhotoUploadGridState extends State<PhotoUploadGrid> {
 
   void _uploadImage(PhotoItem photo) {
     try {
+      if (photo.bytes == null) {
+        setState(() {
+          photo.error = 'No image data available';
+        });
+        return;
+      }
       final ref = _storage.ref('user_photos/${widget.userId}/${photo.fileName}');
       final uploadTask = ref.putData(
-        photo.bytes,
+        photo.bytes!,
         SettableMetadata(contentType: 'image/jpeg'),
       );
 

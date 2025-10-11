@@ -22,7 +22,7 @@ import { StorageModule } from "./storage/storage.module";
 
 import { AuditLogsModule } from "./audit-logs/audit-logs.module";
 import { AnalyticsModule } from "./analytics/analytics.module";
-import { WebsocketModule } from "./websocket/websocket.module";
+// import { WebsocketModule } from "./websocket/websocket.module";
 
 import { StatisticsModule } from "./statistics/statistics.module";
 
@@ -32,7 +32,7 @@ import { StatisticsModule } from "./statistics/statistics.module";
     StatisticsModule,
     AuditLogsModule,
     AnalyticsModule,
-    WebsocketModule,
+    // WebsocketModule, // Temporarily disabled until socket.io is properly configured
     ConfigModule.forRoot({
       isGlobal: true,
     }),

@@ -36,16 +36,16 @@ export class AdminController {
   }
 
   // 월별 코드 목록
-  // @Get("codes")
-  // async getCodes() {
-  //   return this.adminService.getCodes();
-  // }
+  @Get("codes")
+  async getCodes() {
+    return this.adminService.getCodes();
+  }
 
   // 월별 코드 수동 생성
-  // @Post("codes/generate")
-  // async generateCode() {
-  //   return this.adminService.generateMonthlyCodeManually();
-  // }
+  @Post("codes/generate")
+  async generateCode() {
+    return this.adminService.generateMonthlyCodeManually();
+  }
 
   // 추천인 통계
   // @Get("referrals/stats")
