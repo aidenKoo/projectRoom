@@ -19,14 +19,14 @@ export class SurveyOptionsService {
 
   async findAll(): Promise<SurveyOption[]> {
     return this.surveyOptionRepository.find({
-      order: { category: "ASC", sortOrder: "ASC" },
+      order: { category: "ASC", displayOrder: "ASC" },
     });
   }
 
   async findByCategory(category: OptionCategory): Promise<SurveyOption[]> {
     return this.surveyOptionRepository.find({
       where: { category, isActive: true },
-      order: { sortOrder: "ASC" },
+      order: { displayOrder: "ASC" },
     });
   }
 

@@ -31,17 +31,27 @@ export class SurveyOption {
   value: string;
 
   @Column({
+    name: "label_ko",
     type: "varchar",
     length: 100,
     nullable: true,
-    comment: "표시 라벨 (다국어 지원용)",
+    comment: "한국어 라벨",
   })
-  label?: string;
+  labelKo?: string;
 
-  @Column({ type: "int", default: 0, comment: "정렬 순서" })
-  sortOrder: number;
+  @Column({
+    name: "label_en",
+    type: "varchar",
+    length: 100,
+    nullable: true,
+    comment: "영어 라벨",
+  })
+  labelEn?: string;
 
-  @Column({ type: "boolean", default: true, comment: "활성화 여부" })
+  @Column({ name: "display_order", type: "int", default: 0, comment: "정렬 순서" })
+  displayOrder: number;
+
+  @Column({ name: "is_active", type: "boolean", default: true, comment: "활성화 여부" })
   isActive: boolean;
 
   @CreateDateColumn({ name: "created_at" })
