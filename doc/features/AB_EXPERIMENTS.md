@@ -44,6 +44,45 @@ Entity: `apps/api/src/experiments/entities/ab-assignment.entity.ts`
   - Auth: Admin
   - Requires header: `X-Audit-Reason: <why>`
 
+- GET `admin/experiments/overrides`
+  - Auth: Admin
+  - Returns active overrides stored in Redis
+
+- GET `admin/experiments/overrides/:experiment`
+  - Auth: Admin
+  - Returns `{ experiment, override: { variant, expiresAt? } | null }`
+
+- POST `admin/experiments/overrides`
+  - Auth: Admin
+  - Body: `{ experiment, variant, ttlSeconds? }`
+  - Requires header: `X-Audit-Reason`
+  - Overrides deterministic assignment immediately (respects optional `variants` filter)
+
+- DELETE `admin/experiments/overrides/:experiment`
+  - Auth: Admin
+  - Requires header: `X-Audit-Reason`
+  - Clears override
+
+### Snapshots & Reporting
+
+- GET `admin/experiments/snapshots?experiment=<key>&limit=30`
+  - Auth: Admin
+  - Returns recent records from `ab_experiment_snapshots` (date, exposures, conversions, rate)
+
+- POST `admin/experiments/snapshots/capture`
+  - Auth: Admin, requires `X-Audit-Reason`
+  - Body: `{ date?: "YYYY-MM-DD" }` (defaults to today)
+  - Aggregates `ab_events` for the day and upserts snapshot rows
+
+- Cron: `ExperimentsService.handleDailySnapshot` runs nightly (`EVERY_DAY_AT_1AM`) to capture the previous day's data.
+
+### Config History
+
+- GET `admin/experiments/config/history?experiment=<key>&limit=50`
+  - Auth: Admin
+  - Returns recent changes `{ changeType, payload, actor, reason, recordedAt }`
+- Entries are recorded automatically when rollout configs are updated (`changeType: "config"`) or overrides are set/cleared (`override_set`/`override_clear`).
+
 ### Metrics
 
 - POST `v1/experiments/events`
@@ -93,7 +132,15 @@ Entity: `apps/api/src/experiments/entities/ab-assignment.entity.ts`
 - Experiments page (`/experiments`)
   - Displays variant counts + exposure/conversion stats + preview of scoring config.
   - `Edit Rollout` button opens JSON editor for weights/cohort filters.
+  - `Override Variant` modal manages Redis overrides with TTL + audit logging.
   - Force assign / delete actions require `X-Audit-Reason` and log to audit trail.
+
+### Client Helper
+
+- `useExperimentAssignment(experiment, options)` (admin-web/src/hooks)
+  - Fetches assignment with optional variant list, caches per session, auto-records exposure (configurable).
+  - Returns `{ variant, loading, error, recordExposure, recordConversion, refresh }`.
+  - Uses `recordExperimentEvent` for conversion tracking; cache TTL defaults to 6h.
 
 ## Related
 

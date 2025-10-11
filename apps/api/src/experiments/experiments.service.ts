@@ -4,6 +4,14 @@ import { Repository } from "typeorm";
 import { AbAssignment } from "./entities/ab-assignment.entity";
 import { AbEvent, AbEventType } from "./entities/ab-event.entity";
 import { AbExperiment } from "./entities/ab-experiment.entity";
+import { AbExperimentSnapshot } from "./entities/ab-experiment-snapshot.entity";
+import {
+  AbExperimentConfigHistory,
+  ExperimentChangeType,
+} from "./entities/ab-experiment-config-history.entity";
+import { RedisService } from "../common/cache/redis.service";
+import { Cron, CronExpression } from "@nestjs/schedule";
+import { Logger } from "@nestjs/common";
 
 type VariantFilters = {
   regions?: string[];
@@ -28,6 +36,15 @@ export type AssignmentContext = {
   platform?: string | null;
 };
 
+export interface ExperimentOverride {
+  experiment: string;
+  variant: string;
+  expiresAt: Date | null;
+}
+
+const OVERRIDE_KEY_PREFIX = "ab:override:";
+const SNAPSHOT_LOOKBACK_DAYS = 30;
+
 @Injectable()
 export class ExperimentsService {
   constructor(
@@ -37,9 +54,30 @@ export class ExperimentsService {
     private readonly eventRepo: Repository<AbEvent>,
     @InjectRepository(AbExperiment)
     private readonly experimentRepo: Repository<AbExperiment>,
+    @InjectRepository(AbExperimentSnapshot)
+    private readonly snapshotRepo: Repository<AbExperimentSnapshot>,
+    @InjectRepository(AbExperimentConfigHistory)
+    private readonly historyRepo: Repository<AbExperimentConfigHistory>,
+    private readonly redisService: RedisService,
   ) {}
 
+  private readonly logger = new Logger(ExperimentsService.name);
   private configCache = new Map<string, ExperimentConfig>();
+
+  private overrideKey(experiment: string): string {
+    return `${OVERRIDE_KEY_PREFIX}${experiment}`;
+  }
+
+  private startOfDay(date: Date): Date {
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  }
+
+  private endOfDay(date: Date): Date {
+    const start = this.startOfDay(date);
+    const end = new Date(start);
+    end.setDate(end.getDate() + 1);
+    return end;
+  }
 
   private matchesFilters(filters: VariantFilters | undefined, context: AssignmentContext): boolean {
     if (!filters) return true;
@@ -158,6 +196,26 @@ export class ExperimentsService {
     let existing = await this.assignmentRepo.findOne({
       where: { userId, experiment },
     });
+
+    const overrideRecord = await this.getOverrideRecord(experiment);
+    if (overrideRecord) {
+      const allowedSet = variants.length ? new Set(variants) : null;
+      if (!allowedSet || allowedSet.has(overrideRecord.variant)) {
+        if (existing) {
+          if (existing.variant !== overrideRecord.variant) {
+            existing.variant = overrideRecord.variant;
+            existing = await this.assignmentRepo.save(existing);
+          }
+          return existing;
+        }
+        const created = this.assignmentRepo.create({
+          userId,
+          experiment,
+          variant: overrideRecord.variant,
+        });
+        return this.assignmentRepo.save(created);
+      }
+    }
 
     const config = await this.getConfig(experiment);
 
@@ -345,5 +403,164 @@ export class ExperimentsService {
       variants,
       totals: { ...totals, conversionRate: totalRate },
     };
+  }
+
+  async listOverrides(): Promise<ExperimentOverride[]> {
+    const keys = await this.redisService.keys(`${OVERRIDE_KEY_PREFIX}*`);
+    if (!keys.length) return [];
+
+    const overrides = await Promise.all(
+      keys.map(async (key) => {
+        const experiment = key.replace(OVERRIDE_KEY_PREFIX, "");
+        const record = await this.getOverrideRecord(experiment);
+        return record;
+      }),
+    );
+
+    return overrides.filter((override): override is ExperimentOverride => Boolean(override));
+  }
+
+  async getOverride(experiment: string): Promise<ExperimentOverride | null> {
+    return this.getOverrideRecord(experiment);
+  }
+
+  async setOverride(
+    experiment: string,
+    variant: string,
+    ttlSeconds?: number,
+  ): Promise<ExperimentOverride> {
+    const key = this.overrideKey(experiment);
+    const expiresAt = ttlSeconds ? Date.now() + ttlSeconds * 1000 : null;
+    await this.redisService.setJson(
+      key,
+      {
+        variant,
+        expiresAt,
+      },
+      ttlSeconds,
+    );
+
+    return {
+      experiment,
+      variant,
+      expiresAt: expiresAt ? new Date(expiresAt) : null,
+    };
+  }
+
+  async clearOverride(experiment: string): Promise<void> {
+    await this.redisService.del(this.overrideKey(experiment));
+  }
+
+  private async getOverrideRecord(experiment: string): Promise<ExperimentOverride | null> {
+    const key = this.overrideKey(experiment);
+    const record = await this.redisService.getJson<{
+      variant: string;
+      expiresAt?: number | null;
+    }>(key);
+
+    if (!record) {
+      return null;
+    }
+
+    if (record.expiresAt && record.expiresAt < Date.now()) {
+      await this.redisService.del(key);
+      return null;
+    }
+
+    return {
+      experiment,
+      variant: record.variant,
+      expiresAt: record.expiresAt ? new Date(record.expiresAt) : null,
+    };
+  }
+
+  async recordHistory(entry: {
+    experiment: string;
+    changeType: ExperimentChangeType;
+    payload?: Record<string, any> | null;
+    actor?: string | null;
+    reason?: string | null;
+  }): Promise<void> {
+    await this.historyRepo.save(
+      this.historyRepo.create({
+        experiment: entry.experiment,
+        changeType: entry.changeType,
+        payload: entry.payload ?? null,
+        actor: entry.actor ?? null,
+        reason: entry.reason ?? null,
+      }),
+    );
+  }
+
+  async getConfigHistory(experiment?: string, limit = 50): Promise<AbExperimentConfigHistory[]> {
+    const qb = this.historyRepo
+      .createQueryBuilder("history")
+      .orderBy("history.recordedAt", "DESC")
+      .take(limit);
+
+    if (experiment) {
+      qb.where("history.experiment = :experiment", { experiment });
+    }
+
+    return qb.getMany();
+  }
+
+  async captureSnapshot(date: Date = new Date()): Promise<void> {
+    const start = this.startOfDay(date);
+    const end = this.endOfDay(date);
+    const snapshotDate = start.toISOString().split("T")[0];
+
+    const rows = await this.eventRepo
+      .createQueryBuilder("event")
+      .select("event.experiment", "experiment")
+      .addSelect("SUM(CASE WHEN event.event = 'exposure' THEN 1 ELSE 0 END)", "exposures")
+      .addSelect("SUM(CASE WHEN event.event = 'conversion' THEN 1 ELSE 0 END)", "conversions")
+      .where("event.created_at >= :start AND event.created_at < :end", { start, end })
+      .groupBy("event.experiment")
+      .getRawMany<{ experiment: string; exposures: string; conversions: string }>();
+
+    for (const row of rows) {
+      const exposures = Number(row.exposures) || 0;
+      const conversions = Number(row.conversions) || 0;
+      const conversionRate = exposures > 0 ? conversions / exposures : 0;
+
+      await this.snapshotRepo.upsert(
+        {
+          snapshotDate,
+          experiment: row.experiment,
+          exposures,
+          conversions,
+          conversionRate: Number(conversionRate.toFixed(4)),
+        },
+        ["snapshotDate", "experiment"],
+      );
+    }
+
+    this.logger.log(`Captured experiment snapshot for ${snapshotDate} (${rows.length} experiments)`);
+  }
+
+  async getSnapshots(
+    experiment?: string,
+    limit = SNAPSHOT_LOOKBACK_DAYS,
+  ): Promise<AbExperimentSnapshot[]> {
+    const qb = this.snapshotRepo
+      .createQueryBuilder("snapshot")
+      .orderBy("snapshot.snapshotDate", "DESC")
+      .take(limit);
+
+    if (experiment) {
+      qb.where("snapshot.experiment = :experiment", { experiment });
+    }
+
+    return qb.getMany();
+  }
+
+  @Cron(CronExpression.EVERY_DAY_AT_1AM)
+  async handleDailySnapshot() {
+    try {
+      await this.captureSnapshot(new Date());
+    } catch (error: any) {
+      this.logger.error(`Failed to capture experiment snapshot: ${error?.message ?? error}`);
+    }
   }
 }

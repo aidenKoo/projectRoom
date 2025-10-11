@@ -135,6 +135,29 @@
 - doc/features/AB_EXPERIMENTS.md — 감사 헤더 명시
 - doc/progressLog/NEXT_STEPS_AB_CONSOLE.md — 다음 단계 정리
 
+### ✅ A/B 실험 SDK & Override 관리
+- 클라이언트 헬퍼 `useExperimentAssignment` 추가(세션 캐시 + 자동 노출 기록 + 전환 로거)
+- 백엔드: Redis 기반 override 키(`ab:override:*`) 저장, `list/set/clear` API 및 Guard/Audit 연계
+- Admin Web: Override 모달(설정/TTL/삭제), 현재 override 상태 카드 표시 + Dashboard/Experiments 화면에 실험 배치 적용
+
+**파일:**
+- apps/admin-web/src/hooks/useExperiment.ts — 공용 헬퍼
+- apps/admin-web/src/services/api.ts — assignment/override API 추가
+- apps/api/src/experiments/experiments.service.ts, experiments.controller.ts — override 로직/엔드포인트
+- doc/features/AB_EXPERIMENTS.md, doc/progressLog/NEXT_STEPS_AB_CONSOLE.md — 문서 업데이트
+
+### ✅ A/B 실험 스냅샷 & 리포팅 기반 구축
+- 백엔드: `ab_experiment_snapshots` 테이블 및 Repository, 일일 Cron(`handleDailySnapshot`)으로 노출/전환 집계 저장
+- Admin API: `/admin/experiments/snapshots` 조회, `/capture` 수동 실행(감사 로그 포함)
+- Admin Web: Snapshot 뷰 연동 준비(데이터 제공)
+- 문서: 스냅샷 API/크론 워크플로우 추가
+
+**파일:**
+- apps/api/src/experiments/entities/ab-experiment-snapshot.entity.ts
+- apps/api/src/experiments/experiments.service.ts, experiments.controller.ts, experiments.module.ts
+- apps/api/migrations/create_ab_events.sql (snapshot 테이블 포함)
+- doc/features/AB_EXPERIMENTS.md
+
 ---
 
 ### ✅ 관리자 대시보드 고도화

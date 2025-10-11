@@ -233,6 +233,17 @@ export type AbAssignment = {
   assignedAt: string;
 };
 
+export type ExperimentAssignment = {
+  experiment: string;
+  variant: string;
+};
+
+export type ExperimentOverride = {
+  experiment: string;
+  variant: string;
+  expiresAt?: string | null;
+};
+
 export type AbAssignmentList = {
   items: AbAssignment[];
   total: number;
@@ -260,6 +271,23 @@ export async function fetchAbVariantCounts(experiment: string) {
     '/admin/experiments/variants',
     { params: { experiment } },
   );
+  return response.data;
+}
+
+export async function fetchExperimentAssignment(params: {
+  experiment: string;
+  variants?: string[];
+  recordExposure?: boolean;
+  platform?: string;
+}): Promise<ExperimentAssignment> {
+  const response = await api.get<ExperimentAssignment>('/experiments/assignment', {
+    params: {
+      experiment: params.experiment,
+      record: params.recordExposure ? 1 : 0,
+      platform: params.platform,
+      variants: params.variants,
+    },
+  });
   return response.data;
 }
 
@@ -305,6 +333,64 @@ export async function updateExperimentRolloutConfig(experiment: string, payload:
   const response = await api.put<{ experiment: string; config: any }>(
     `/admin/experiments/config/${encodeURIComponent(experiment)}`,
     payload
+  );
+  return response.data;
+}
+
+export async function fetchExperimentOverride(experiment: string) {
+  const response = await api.get<{ experiment: string; override: ExperimentOverride | null }>(
+    `/admin/experiments/overrides/${encodeURIComponent(experiment)}`
+  );
+  return response.data;
+}
+
+export async function setExperimentOverride(
+  body: { experiment: string; variant: string; ttlSeconds?: number },
+  auditReason: string,
+) {
+  const response = await api.post<{ override: ExperimentOverride }>(
+    '/admin/experiments/overrides',
+    body,
+    {
+      headers: { 'X-Audit-Reason': auditReason },
+    },
+  );
+  return response.data;
+}
+
+export async function deleteExperimentOverride(experiment: string, auditReason: string) {
+  const response = await api.delete<{ ok: true }>(
+    `/admin/experiments/overrides/${encodeURIComponent(experiment)}`,
+    {
+      headers: { 'X-Audit-Reason': auditReason },
+    },
+  );
+  return response.data;
+}
+
+export async function fetchExperimentSnapshots(params?: { experiment?: string; limit?: number }) {
+  const response = await api.get<{ snapshots: Array<{ snapshotDate: string; experiment: string; exposures: number; conversions: number; conversionRate: number; capturedAt: string }> }>(
+    '/admin/experiments/snapshots',
+    { params },
+  );
+  return response.data;
+}
+
+export async function captureExperimentSnapshot(body: { date?: string }, auditReason: string) {
+  const response = await api.post<{ ok: true }>(
+    '/admin/experiments/snapshots/capture',
+    body,
+    {
+      headers: { 'X-Audit-Reason': auditReason },
+    },
+  );
+  return response.data;
+}
+
+export async function fetchExperimentConfigHistory(params?: { experiment?: string; limit?: number }) {
+  const response = await api.get<{ history: Array<{ id: number; experiment: string; changeType: string; payload?: Record<string, any>; actor?: string; reason?: string; recordedAt: string }> }>(
+    '/admin/experiments/config/history',
+    { params },
   );
   return response.data;
 }

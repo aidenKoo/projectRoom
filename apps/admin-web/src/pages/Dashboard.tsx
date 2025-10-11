@@ -9,6 +9,9 @@ import {
   Typography,
   Table,
   Space,
+  Button,
+  message,
+  Tag,
 } from 'antd';
 import { ArrowUpOutlined, ExperimentOutlined } from '@ant-design/icons';
 import {
@@ -22,6 +25,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import api from '../services/api';
+import { useExperimentAssignment } from '../hooks/useExperiment';
 
 const { Title } = Typography;
 
@@ -75,6 +79,18 @@ const Dashboard: React.FC = () => {
   const [matchTrend, setMatchTrend] = useState<MatchTrendPoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  const layoutExperiment = useExperimentAssignment('dashboard_layout', {
+    variants: ['classic', 'compact'],
+    autoRecordExposure: true,
+    platform: 'admin-web',
+  });
+
+  const layoutVariant = layoutExperiment.variant ?? 'classic';
+  const layoutLoading = layoutExperiment.loading;
+  const isCompact = layoutVariant === 'compact';
+  const primaryGutter: [number, number] = isCompact ? [12, 12] : [16, 16];
+  const secondaryGutter: [number, number] = isCompact ? [12, 12] : [16, 16];
 
   useEffect(() => {
     const fetchData = async () => {
@@ -156,8 +172,19 @@ const Dashboard: React.FC = () => {
   return (
     <div>
       <Title level={2} style={{ marginBottom: 24 }}>Dashboard</Title>
+      <Space style={{ marginBottom: 16 }}>
+        <Tag color={isCompact ? 'blue' : 'default'}>
+          Layout Variant: {layoutLoading ? 'Loading…' : layoutVariant}
+        </Tag>
+        <Button size="small" disabled={layoutLoading || !layoutExperiment.variant} onClick={async () => {
+          await layoutExperiment.recordConversion({ action: 'dashboard_reviewed' });
+          message.success('Recorded dashboard review conversion');
+        }}>
+          Mark Dashboard Reviewed
+        </Button>
+      </Space>
 
-      <Row gutter={[16, 16]}>
+      <Row gutter={primaryGutter}>
         <Col xs={24} sm={12} md={6}>
           <Card>
             <Statistic title="Total Users" value={stats?.users.total ?? 0} />
@@ -187,7 +214,7 @@ const Dashboard: React.FC = () => {
         </Col>
       </Row>
 
-      <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
+      <Row gutter={primaryGutter} style={{ marginTop: 16 }}>
         <Col xs={24} sm={12} md={6}>
           <Card>
             <Statistic title="Total Matches" value={stats?.matching?.totalMatches ?? 0} />
@@ -242,7 +269,7 @@ const Dashboard: React.FC = () => {
       </Row>
 
       <Title level={3} style={{ margin: '32px 0 16px' }}>Moderation Overview</Title>
-      <Row gutter={[16, 16]}>
+      <Row gutter={secondaryGutter}>
         {moderationCards.map((card) => (
           <Col xs={12} sm={6} key={card.title}>
             <Card>
@@ -266,7 +293,7 @@ const Dashboard: React.FC = () => {
         </ResponsiveContainer>
       </Card>
 
-      <Row gutter={[16, 16]} style={{ marginTop: 32 }}>
+      <Row gutter={secondaryGutter} style={{ marginTop: 32 }}>
         <Col xs={24} md={12}>
           <Title level={3} style={{ margin: '0 0 16px' }}>Match Rate Trend (30 Days)</Title>
           <Card>

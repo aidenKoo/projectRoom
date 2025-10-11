@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route, Link, Navigate, useLocation } from 'react
 import { Layout, Menu, Spin, Button, theme as antdTheme } from 'antd';
 import { onAuthStateChanged, type User } from 'firebase/auth';
 import { auth } from './firebase.ts';
+import { clearAllExperimentCaches } from './hooks/useExperiment';
 
 import { DashboardOutlined, UserOutlined, QrcodeOutlined, UnorderedListOutlined, HistoryOutlined, DeploymentUnitOutlined, SafetyCertificateOutlined, BranchesOutlined } from '@ant-design/icons';
 
@@ -47,6 +48,7 @@ const App: React.FC = () => {
   const location = useLocation();
 
   const handleLogout = () => {
+    clearAllExperimentCaches();
     auth.signOut();
   };
 
