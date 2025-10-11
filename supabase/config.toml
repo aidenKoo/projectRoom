@@ -58,6 +58,17 @@ enable_confirmations = false
 enable_signup = false
 enable_confirmations = false
 
+# OAuth Providers
+[auth.external.google]
+enabled = true
+client_id = "env(GOOGLE_CLIENT_ID)"
+secret = "env(GOOGLE_CLIENT_SECRET)"
+
+[auth.external.apple]
+enabled = true
+client_id = "env(APPLE_CLIENT_ID)"
+secret = "env(APPLE_CLIENT_SECRET)"
+
 # Edge Functions
 [functions]
 enabled = true
