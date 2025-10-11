@@ -214,3 +214,74 @@ export async function moderatePhotoDecision(
 }
 
 export default api;
+
+// =====================
+// A/B Experiments (Admin)
+// =====================
+
+export type AbAssignment = {
+  id: number;
+  userId: number;
+  experiment: string;
+  variant: string;
+  assignedAt: string;
+};
+
+export type AbAssignmentList = {
+  items: AbAssignment[];
+  total: number;
+  page: number;
+  limit: number;
+};
+
+export async function fetchAbAssignments(params?: {
+  experiment?: string;
+  variant?: string;
+  page?: number;
+  limit?: number;
+}) {
+  const query: Record<string, string | number> = {};
+  if (params?.experiment) query.experiment = params.experiment;
+  if (params?.variant) query.variant = params.variant;
+  if (params?.page) query.page = params.page;
+  if (params?.limit) query.limit = params.limit;
+  const response = await api.get<AbAssignmentList>('/admin/experiments/assignments', { params: query });
+  return response.data;
+}
+
+export async function fetchAbVariantCounts(experiment: string) {
+  const response = await api.get<{ experiment: string; counts: Record<string, number> }>(
+    '/admin/experiments/variants',
+    { params: { experiment } },
+  );
+  return response.data;
+}
+
+// Match config experiments (available keys and config preview)
+export async function fetchAvailableExperiments() {
+  const response = await api.get<{ available: string[]; configs: Record<string, any> }>(
+    '/admin/match/config/experiments'
+  );
+  return response.data;
+}
+
+export async function fetchExperimentConfig(key: string) {
+  const response = await api.get<{ experimentKey: string; config: Record<string, any>; isDefault: boolean }>(
+    `/admin/match/config/experiments/${encodeURIComponent(key)}`
+  );
+  return response.data;
+}
+
+export async function forceAbAssignment(body: { userId: number; experiment: string; variant: string }, auditReason: string) {
+  const response = await api.post<AbAssignment>('/admin/experiments/assignments', body, {
+    headers: { 'X-Audit-Reason': auditReason },
+  });
+  return response.data;
+}
+
+export async function deleteAbAssignment(id: number, auditReason: string) {
+  const response = await api.delete<{ ok: true }>(`/admin/experiments/assignments/${id}`, {
+    headers: { 'X-Audit-Reason': auditReason },
+  });
+  return response.data;
+}

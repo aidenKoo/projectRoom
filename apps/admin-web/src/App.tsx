@@ -5,7 +5,7 @@ import { Layout, Menu, Spin, Button, theme as antdTheme } from 'antd';
 import { onAuthStateChanged, type User } from 'firebase/auth';
 import { auth } from './firebase.ts';
 
-import { DashboardOutlined, UserOutlined, QrcodeOutlined, UnorderedListOutlined, HistoryOutlined, DeploymentUnitOutlined, SafetyCertificateOutlined } from '@ant-design/icons';
+import { DashboardOutlined, UserOutlined, QrcodeOutlined, UnorderedListOutlined, HistoryOutlined, DeploymentUnitOutlined, SafetyCertificateOutlined, BranchesOutlined } from '@ant-design/icons';
 
 import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
@@ -15,6 +15,7 @@ import OptionManagement from './pages/OptionManagement';
 import AuditLog from './pages/AuditLog';
 import MatchMonitoring from './pages/MatchMonitoring';
 import PhotoModeration from './pages/PhotoModeration';
+import Experiments from './pages/Experiments';
 
 const { Header, Content, Sider } = Layout;
 
@@ -75,6 +76,9 @@ const App: React.FC = () => {
                   <Menu.Item key="/moderation" icon={<SafetyCertificateOutlined />}>
                     <Link to="/moderation">Moderation</Link>
                   </Menu.Item>
+                  <Menu.Item key="/experiments" icon={<BranchesOutlined />}>
+                    <Link to="/experiments">Experiments</Link>
+                  </Menu.Item>
                   <Menu.Item key="/options" icon={<UnorderedListOutlined />}>
                     <Link to="/options">Options</Link>
                   </Menu.Item>
@@ -95,6 +99,7 @@ const App: React.FC = () => {
                         <Route path="/codes" element={<CodeManagement />} />
                         <Route path="/match" element={<MatchMonitoring />} />
                         <Route path="/moderation" element={<PhotoModeration />} />
+                        <Route path="/experiments" element={<Experiments />} />
                         <Route path="/options" element={<OptionManagement />} />
                         <Route path="/logs" element={<AuditLog />} />
                     </Routes>

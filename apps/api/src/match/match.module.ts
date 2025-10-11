@@ -4,6 +4,7 @@ import { HttpModule } from "@nestjs/axios";
 import { ConfigModule } from "@nestjs/config";
 import { MatchController } from "./match.controller";
 import { MatchConfigController } from "./match-config.controller";
+import { MatchBenchmarkController } from "./match-benchmark.controller";
 import { MatchService } from "./match.service";
 import { MatchScorerService } from "./match-scorer.service";
 import { Like } from "./entities/like.entity";
@@ -30,7 +31,11 @@ import { Conversation } from "../conversations/entities/conversation.entity";
     HttpModule,
     ConfigModule,
   ],
-  controllers: [MatchController, MatchConfigController],
+  controllers: [
+    MatchController,
+    MatchConfigController,
+    MatchBenchmarkController,
+  ],
   providers: [MatchService, MatchScorerService],
   exports: [MatchService, MatchScorerService],
 })

@@ -59,6 +59,10 @@ export class ExperimentsService {
     await this.assignmentRepo.delete(id);
   }
 
+  async findById(id: number): Promise<AbAssignment | null> {
+    return this.assignmentRepo.findOne({ where: { id } });
+  }
+
   async list(
     options: { experiment?: string; variant?: string; page?: number; limit?: number } = {},
   ) {
@@ -92,4 +96,3 @@ export class ExperimentsService {
     }, {} as Record<string, number>);
   }
 }
-
