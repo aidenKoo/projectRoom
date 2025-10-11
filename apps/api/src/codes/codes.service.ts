@@ -2,7 +2,6 @@ import { Injectable, BadRequestException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { MonthlyCode } from "./entities/monthly-code.entity";
-import { Cron } from "@nestjs/schedule";
 
 @Injectable()
 export class CodesService {
@@ -12,18 +11,10 @@ export class CodesService {
   ) {}
 
   /**
-   * 매월 1일 00:00 KST에 자동으로 코드 생성
-   * 크론: '0 0 1 * *' (매월 1일 0시 0분)
+   * 월별 가입코드 자동 생성은 Supabase Edge Function으로 이전됨
+   * Edge Function: monthly-code-generator
+   * 크론 스케줄: '0 0 1 * *' (매월 1일 0시 0분 KST)
    */
-  @Cron("0 0 1 * *", {
-    name: "generate-monthly-code",
-    timeZone: "Asia/Seoul",
-  })
-  async autoGenerateMonthlyCode() {
-    const code = await this.generateMonthlyCode();
-    console.log(`✅ [CRON] 월별 가입코드 자동 생성 완료: ${code.code}`);
-    return code;
-  }
 
   /**
    * 월별 가입코드 생성 (수동/자동)

@@ -195,16 +195,11 @@ export class MatchService {
     }
   }
 
-  // 72시간 지난 추천 재노출 정리 (크론 잡용)
-  async cleanupOldRecommendations(): Promise<void> {
-    const threshold = new Date();
-    threshold.setHours(threshold.getHours() - 72);
-
-    await this.recommendationRepository.delete({
-      shownAt: LessThan(threshold),
-      isShown: true,
-    });
-  }
+  /**
+   * 72시간 지난 추천 재노출 정리
+   * Supabase Edge Function으로 이전됨: recommendation-cleanup
+   * 크론 스케줄: 매일 03:00 KST
+   */
 
   // 매칭 후 초기 질문 답변 저장
   async saveInitialAnswers(
