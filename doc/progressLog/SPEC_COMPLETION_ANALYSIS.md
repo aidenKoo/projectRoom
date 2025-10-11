@@ -47,7 +47,7 @@
 ### 1.4 관리자 제품 (섹션 6)
 | 세부 항목 | 상태 | 진척도 | 메모 |
 | --- | --- | --- | --- |
-| 6.1) 대시보드 | 진행 | 85% | KPI 카드/그래프 완성, 실험 통계 엔드포인트 추가 |
+| 6.1) 대시보드 | 진행 | 95% | 사용자/매칭/메시징/모더레이션/실험 요약 카드 및 추세 차트 완성, 실험 전환 통계 연동 |
 | 6.1.1) 사용자 관리 | ✅ 완료 | 90% | 검색·감사 사유 입력·상세 모달 완료 |
 | 6.1.2) 매칭 큐 | ✅ 완료 | 100% | 고급 필터링(점수/날짜/사용자) + 페이지네이션 완성 |
 | 6.1.3) 콘텐츠 모더레이션 | ✅ 완료 | 100% | 자동 플래그 + 어드민 UI + 해시 동기화 완성 |
@@ -134,6 +134,17 @@
 - apps/admin-web/src/services/api.ts — API 클라이언트 추가
 - doc/features/AB_EXPERIMENTS.md — 감사 헤더 명시
 - doc/progressLog/NEXT_STEPS_AB_CONSOLE.md — 다음 단계 정리
+
+---
+
+### ✅ 관리자 대시보드 고도화
+- 백엔드: `/analytics/dashboard`에 유저/매칭/메시지/모더레이션/실험 요약 포함, 코호트별 전환 집계
+- 새 API: `getModerationSummary`, `getExperimentOverview`로 사진·실험 통계 제공
+- Admin Web: 대시보드 카드 재구성(사용자/매칭/메시징/모더레이션/실험), 매칭률 추세·실험 성과 테이블 추가
+
+**파일:**
+- apps/api/src/analytics/analytics.service.ts, analytics.module.ts
+- apps/admin-web/src/pages/Dashboard.tsx
 
 ---
 

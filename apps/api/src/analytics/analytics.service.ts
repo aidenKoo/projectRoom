@@ -6,6 +6,11 @@ import { Match } from "../match/entities/match.entity";
 import { Like } from "../match/entities/like.entity";
 import { Message } from "../conversations/entities/message.entity";
 import { Conversation } from "../conversations/entities/conversation.entity";
+import {
+  PhotoMeta,
+  PhotoModerationStatus,
+} from "../photos/entities/photo-meta.entity";
+import { AbEvent } from "../experiments/entities/ab-event.entity";
 
 export interface DailyStats {
   date: string;
@@ -30,6 +35,30 @@ export interface MessagingStats {
   firstMessageRate: number; // 상호매칭 후 첫 메시지 전송률
 }
 
+export interface ModerationSummary {
+  pending: number;
+  autoFlagged: number;
+  approved: number;
+  rejected: number;
+}
+
+export interface ExperimentAggregate {
+  experiment: string;
+  exposures: number;
+  conversions: number;
+  conversionRate: number;
+}
+
+export interface ExperimentOverview {
+  timeframeDays: number;
+  totals: {
+    exposures: number;
+    conversions: number;
+    conversionRate: number;
+  };
+  experiments: ExperimentAggregate[];
+}
+
 @Injectable()
 export class AnalyticsService {
   constructor(
@@ -43,6 +72,10 @@ export class AnalyticsService {
     private readonly messageRepository: Repository<Message>,
     @InjectRepository(Conversation)
     private readonly conversationRepository: Repository<Conversation>,
+    @InjectRepository(PhotoMeta)
+    private readonly photoMetaRepository: Repository<PhotoMeta>,
+    @InjectRepository(AbEvent)
+    private readonly abEventRepository: Repository<AbEvent>,
   ) {}
 
   /**
@@ -162,6 +195,98 @@ export class AnalyticsService {
     };
   }
 
+  async getModerationSummary(): Promise<ModerationSummary> {
+    const rows = await this.photoMetaRepository
+      .createQueryBuilder("meta")
+      .select("meta.status", "status")
+      .addSelect("COUNT(*)", "count")
+      .groupBy("meta.status")
+      .getRawMany<{ status: PhotoModerationStatus; count: string }>();
+
+    const summary: ModerationSummary = {
+      pending: 0,
+      autoFlagged: 0,
+      approved: 0,
+      rejected: 0,
+    };
+
+    rows.forEach((row) => {
+      const status = row.status as PhotoModerationStatus;
+      const count = Number(row.count) || 0;
+      switch (status) {
+        case PhotoModerationStatus.PENDING:
+          summary.pending = count;
+          break;
+        case PhotoModerationStatus.AUTO_FLAGGED:
+          summary.autoFlagged = count;
+          break;
+        case PhotoModerationStatus.APPROVED:
+          summary.approved = count;
+          break;
+        case PhotoModerationStatus.REJECTED:
+          summary.rejected = count;
+          break;
+        default:
+          break;
+      }
+    });
+
+    return summary;
+  }
+
+  async getExperimentOverview(days = 30): Promise<ExperimentOverview> {
+    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
+    const rows = await this.abEventRepository
+      .createQueryBuilder("event")
+      .select("event.experiment", "experiment")
+      .addSelect(
+        "SUM(CASE WHEN event.event = 'exposure' THEN 1 ELSE 0 END)",
+        "exposures",
+      )
+      .addSelect(
+        "SUM(CASE WHEN event.event = 'conversion' THEN 1 ELSE 0 END)",
+        "conversions",
+      )
+      .where("event.created_at >= :since", { since })
+      .groupBy("event.experiment")
+      .orderBy("exposures", "DESC")
+      .getRawMany<{ experiment: string; exposures: string; conversions: string }>();
+
+    const experiments: ExperimentAggregate[] = rows.map((row) => {
+      const exposures = Number(row.exposures) || 0;
+      const conversions = Number(row.conversions) || 0;
+      const conversionRate = exposures > 0 ? conversions / exposures : 0;
+      return {
+        experiment: row.experiment,
+        exposures,
+        conversions,
+        conversionRate: Number(conversionRate.toFixed(4)),
+      };
+    });
+
+    const totals = experiments.reduce(
+      (acc, exp) => {
+        acc.exposures += exp.exposures;
+        acc.conversions += exp.conversions;
+        return acc;
+      },
+      { exposures: 0, conversions: 0 },
+    );
+
+    const totalRate = totals.exposures > 0 ? totals.conversions / totals.exposures : 0;
+
+    return {
+      timeframeDays: days,
+      totals: {
+        exposures: totals.exposures,
+        conversions: totals.conversions,
+        conversionRate: Number(totalRate.toFixed(4)),
+      },
+      experiments,
+    };
+  }
+
   /**
    * 가입자 증가 추이 (최근 N일)
    */
@@ -228,27 +353,36 @@ export class AnalyticsService {
    * 전체 대시보드 통계 (요약)
    */
   async getDashboardStats() {
-    const [totalUsers, activeUsers30d, matchingStats, messagingStats] =
+    const now = Date.now();
+    const [totalUsers, activeUsers30d, newUsers24h, matchingStats, messagingStats, moderationSummary, experiments] =
       await Promise.all([
         this.userRepository.count(),
         this.userRepository.count({
           where: {
-            updated_at: MoreThanOrEqual(
-              new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
-            ),
+            updated_at: MoreThanOrEqual(new Date(now - 30 * 24 * 60 * 60 * 1000)),
+          },
+        }),
+        this.userRepository.count({
+          where: {
+            created_at: MoreThanOrEqual(new Date(now - 24 * 60 * 60 * 1000)),
           },
         }),
         this.getMatchingStats(),
         this.getMessagingStats(),
+        this.getModerationSummary(),
+        this.getExperimentOverview(30),
       ]);
 
     return {
       users: {
         total: totalUsers,
         active30d: activeUsers30d,
+        new24h: newUsers24h,
       },
       matching: matchingStats,
       messaging: messagingStats,
+      moderation: moderationSummary,
+      experiments,
     };
   }
 }
