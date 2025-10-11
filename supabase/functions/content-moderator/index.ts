@@ -2,7 +2,7 @@
 // Moderates photos via Claude and notifies backend webhook
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { moderateContent } from "../_shared/anthropic.ts";
+import { moderateContent, moderateImage } from "../_shared/anthropic.ts";
 import { calculateImageHash } from "../_shared/hash.ts";
 
 const corsHeaders = {
@@ -91,10 +91,13 @@ serve(async (req) => {
       // Continue without hash - it's not critical for moderation
     }
 
-    const moderation = await moderateContent(
-      publicUrl,
-      (type as "profile" | "message" | "photo_caption") ?? "photo_caption",
-    );
+    const moderation =
+      type === "photo"
+        ? await moderateImage(publicUrl)
+        : await moderateContent(
+            publicUrl,
+            (type as "profile" | "message" | "photo_caption") ?? "photo_caption",
+          );
 
     if (!WEBHOOK_URL || !WEBHOOK_SECRET) {
       throw new Error("PHOTO_MODERATION webhook configuration is missing");

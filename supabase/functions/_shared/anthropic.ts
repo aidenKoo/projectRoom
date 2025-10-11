@@ -65,7 +65,7 @@ export interface ModerationResult {
 
 export async function moderateContent(
   content: string,
-  type: "profile" | "message" | "photo_caption"
+  type: "profile" | "message" | "photo_caption",
 ): Promise<ModerationResult> {
   const message = await anthropic.messages.create({
     model: "claude-3-5-sonnet-20241022",
@@ -101,6 +101,42 @@ JSON 형식으로 응답:
   }
 
   throw new Error("Unexpected response format");
+}
+
+/**
+ * Image moderation using Claude vision API.
+ * Accepts a public image URL and returns moderation result JSON.
+ */
+export async function moderateImage(imageUrl: string): Promise<ModerationResult> {
+  const message = await anthropic.messages.create({
+    model: "claude-3-5-sonnet-20241022",
+    max_tokens: 512,
+    messages: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "image",
+            source: {
+              type: "url",
+              media_type: "image/jpeg",
+              url: imageUrl,
+            },
+          },
+          {
+            type: "text",
+            text: `해당 이미지를 한국어 데이팅 앱 기준으로 모더레이션하세요. 다음 항목을 점검하고 JSON으로만 응답하세요:\n- 노출/성적 콘텐츠\n- 폭력성\n- 혐오/차별\n- 불법/위험 행위\n- 기타 규정 위반\n\n응답 JSON 형식:\n{\n  "flagged": true/false,\n  "confidence": 0.0-1.0,\n  "reasons": ["발견된 문제들"],\n  "severity": "low|medium|high"\n}`,
+          },
+        ],
+      },
+    ],
+  });
+
+  const content = message.content[0];
+  if (content.type === "text") {
+    return JSON.parse(content.text);
+  }
+  throw new Error("Unexpected response format for image moderation");
 }
 
 export interface MatchExplanation {

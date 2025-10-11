@@ -29,11 +29,11 @@
 1. **Supabase Trigger Flow**
    - ✅ Edge Function이 백엔드 Webhook으로 결과를 전달하도록 전환(2025-10-12 완료).
    - ✅ Storage 업로드 → `/internal/photos/storage/upload` webhook 경유로 자동 심사 요청(백엔드 엔드포인트 + Cloud Function 연계 완료).
-   - [ ] Cloud Function 환경 변수(secrets) 배포 및 재시도/알람 설정.
-  - [ ] Cloud Function 제공 해시/메타데이터 수집 후 `photo_meta.hash` 저장.
+   - 🔄 Cloud Function: 재시도(지수 백오프) 구현 완료, 알람은 GCP Log 기반 구성 필요. Secrets 설정 가이드 추가(docs/operations/CLOUD_FUNCTIONS_SETUP.md).
+  - 🔄 Cloud Function: 해시/메타데이터(width/height/bytes/public_url) 수집 및 전달 구현(백엔드 저장 경로 연동), 운영 환경 검증 필요.
 2. **NSFW Auto Flow**
-   - Replace placeholder `type: "photo_caption"` payload with actual binary-safe moderation function (pass signed URL or base64).
-   - Store moderation confidence curve and raw labels in a dedicated JSON schema (`{ provider, label, score }`).
+   - ✅ Edge Function이 `type: "photo"` 처리 시 이미지 비전 모더레이션 호출하도록 수정.
+   - [ ] 모더레이션 결과의 라벨/점수 구조화 저장(JSON: `{ provider, label, score }`).
 3. **Admin UI Enhancements**
    - ✅ 상태·검색·날짜 필터 및 페이지네이션 추가(2025-10-12 완료).
    - [ ] Batch actions (approve/reject multiple).
