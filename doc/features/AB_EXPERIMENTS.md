@@ -37,12 +37,13 @@ Entity: `apps/api/src/experiments/entities/ab-assignment.entity.ts`
   - Auth: Admin
   - Body: `{ userId, experiment, variant }`
   - Force create/update
+  - Requires header: `X-Audit-Reason: <why>`
 
 - DELETE `admin/experiments/assignments/:id`
   - Auth: Admin
+  - Requires header: `X-Audit-Reason: <why>`
 
 ## Related
 
 - Matching configs for experiments: `apps/api/src/match/config/scoring-config.ts`
   - Use the returned `variant` to select an experiment key or map variants to config keys in client/admin.
-
