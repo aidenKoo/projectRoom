@@ -7,6 +7,7 @@ import { ForceAssignDto, ListAssignmentsQueryDto } from "./dto/assign.dto";
 import { UsersService } from "../users/users.service";
 import { AuditLogsService } from "../audit-logs/audit-logs.service";
 import { AuditAction } from "../audit-logs/entities/audit-log.entity";
+import { IsIn, IsOptional, IsString } from "class-validator";
 
 @ApiTags("experiments")
 @Controller()
@@ -26,6 +27,7 @@ export class ExperimentsController {
     @Request() req,
     @Query("experiment") experiment: string,
     @Query("variants") variantsQuery?: string | string[],
+    @Query("record") record?: string,
   ) {
     const firebaseUid = req.user.uid;
     const user = await this.usersService.findByFirebaseUid(firebaseUid);
@@ -35,6 +37,9 @@ export class ExperimentsController {
       else if (typeof variantsQuery === "string") variants = variantsQuery.split(",").map((v) => v.trim()).filter(Boolean);
     }
     const a = await this.experimentsService.getOrAssign(user.id, experiment, variants);
+    if (record === "1" || record === "true") {
+      await this.experimentsService.recordEvent(user.id, experiment, a.variant, "exposure");
+    }
     return { experiment: a.experiment, variant: a.variant };
   }
 
@@ -124,5 +129,41 @@ export class ExperimentsController {
       });
     }
     return { ok: true };
+  }
+
+  // Client: record experiment event (exposure/conversion)
+  @Post("v1/experiments/events")
+  @UseGuards(FirebaseAuthGuard)
+  @ApiBearerAuth("firebase")
+  @ApiOperation({ summary: "Record experiment exposure/conversion event" })
+  async recordEvent(
+    @Request() req,
+    @Body() body: { experiment: string; event: "exposure" | "conversion"; variant?: string; properties?: Record<string, any> },
+  ) {
+    const firebaseUid = req.user.uid;
+    const user = await this.usersService.findByFirebaseUid(firebaseUid);
+    const saved = await this.experimentsService.recordEvent(
+      user.id,
+      body.experiment,
+      body.variant,
+      body.event,
+      body.properties,
+    );
+    return { ok: true, id: saved.id };
+  }
+
+  // Admin: stats summary by experiment
+  @Get("admin/experiments/stats")
+  @UseGuards(FirebaseAuthGuard, AdminGuard)
+  @ApiBearerAuth("firebase")
+  @ApiOperation({ summary: "Get experiment stats (exposures, conversions, rates)" })
+  async getStats(
+    @Query("experiment") experiment: string,
+    @Query("dateFrom") dateFromParam?: string,
+    @Query("dateTo") dateToParam?: string,
+  ) {
+    const dateFrom = dateFromParam ? new Date(dateFromParam) : undefined;
+    const dateTo = dateToParam ? new Date(dateToParam) : undefined;
+    return this.experimentsService.getStats(experiment, dateFrom, dateTo);
   }
 }

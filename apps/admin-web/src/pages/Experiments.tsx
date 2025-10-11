@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button, Card, Col, Form, Input, Modal, Row, Select, Space, Statistic, Table, Tag, Typography, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { fetchAbAssignments, fetchAbVariantCounts, forceAbAssignment, deleteAbAssignment, fetchAvailableExperiments, fetchExperimentConfig } from '../services/api';
+import { fetchAbAssignments, fetchAbVariantCounts, forceAbAssignment, deleteAbAssignment, fetchAvailableExperiments, fetchExperimentConfig, fetchAbStats } from '../services/api';
 import type { AbAssignment } from '../services/api';
 
 const { Title, Text } = Typography;
@@ -16,6 +16,7 @@ const Experiments: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(false);
   const [assignments, setAssignments] = useState<AbAssignment[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
+  const [stats, setStats] = useState<{ variants: Array<{ variant: string; exposures: number; conversions: number; conversionRate: number }>; totals: { exposures: number; conversions: number; conversionRate: number } } | null>(null);
   const [pagination, setPagination] = useState<{ current: number; pageSize: number; total: number }>(
     { current: 1, pageSize: DEFAULT_PAGE_SIZE, total: 0 },
   );
@@ -34,6 +35,16 @@ const Experiments: React.FC = () => {
       setCounts(res.counts || {});
     } catch (e: any) {
       message.error(`Failed to load counts: ${e?.message || e}`);
+    }
+  }, []);
+
+  const loadStats = useCallback(async (exp: string) => {
+    if (!exp) return;
+    try {
+      const res = await fetchAbStats({ experiment: exp });
+      setStats({ variants: res.variants, totals: res.totals });
+    } catch (e: any) {
+      message.error(`Failed to load stats: ${e?.message || e}`);
     }
   }, []);
 
@@ -72,7 +83,8 @@ const Experiments: React.FC = () => {
   useEffect(() => {
     loadCounts(experimentKey);
     loadAssignments(1, DEFAULT_PAGE_SIZE, experimentKey, variantFilter);
-  }, [experimentKey, variantFilter, loadCounts, loadAssignments]);
+    loadStats(experimentKey);
+  }, [experimentKey, variantFilter, loadCounts, loadAssignments, loadStats]);
 
   const variantOptions = useMemo(() => {
     const keys = Object.keys(counts);
@@ -138,6 +150,25 @@ const Experiments: React.FC = () => {
           </Col>
         ))}
       </Row>
+
+      {stats && (
+        <Card title="Variant Stats (exposures/conversions/CR)">
+          <Row gutter={16}>
+            {stats.variants.map((v) => (
+              <Col span={6} key={v.variant}>
+                <Card>
+                  <Space direction="vertical">
+                    <Text strong>Variant {v.variant}</Text>
+                    <Text>Exposures: {v.exposures}</Text>
+                    <Text>Conversions: {v.conversions}</Text>
+                    <Text>CR: {(v.conversionRate * 100).toFixed(2)}%</Text>
+                  </Space>
+                </Card>
+              </Col>
+            ))}
+          </Row>
+        </Card>
+      )}
 
       <Card>
         <Table

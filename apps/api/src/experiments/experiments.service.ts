@@ -1,13 +1,16 @@
 import { Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
+import { Between, Repository } from "typeorm";
 import { AbAssignment } from "./entities/ab-assignment.entity";
+import { AbEvent, AbEventType } from "./entities/ab-event.entity";
 
 @Injectable()
 export class ExperimentsService {
   constructor(
     @InjectRepository(AbAssignment)
     private readonly assignmentRepo: Repository<AbAssignment>,
+    @InjectRepository(AbEvent)
+    private readonly eventRepo: Repository<AbEvent>,
   ) {}
 
   private stableVariant(
@@ -94,5 +97,87 @@ export class ExperimentsService {
       acc[r.variant] = Number(r.cnt);
       return acc;
     }, {} as Record<string, number>);
+  }
+
+  async recordEvent(
+    userId: number,
+    experiment: string,
+    variant: string | undefined,
+    event: AbEventType,
+    properties?: Record<string, any>,
+  ): Promise<AbEvent> {
+    let finalVariant = variant;
+    if (!finalVariant) {
+      const assignment = await this.assignmentRepo.findOne({ where: { userId, experiment } });
+      finalVariant = assignment?.variant ?? "A";
+    }
+    const created = this.eventRepo.create({
+      userId,
+      experiment,
+      variant: finalVariant!,
+      event,
+      properties: properties ?? null,
+    });
+    return this.eventRepo.save(created);
+  }
+
+  async getStats(
+    experiment: string,
+    dateFrom?: Date,
+    dateTo?: Date,
+  ): Promise<{
+    experiment: string;
+    variants: Array<{ variant: string; exposures: number; conversions: number; conversionRate: number }>;
+    totals: { exposures: number; conversions: number; conversionRate: number };
+  }> {
+    const where: any = { experiment };
+    if (dateFrom && dateTo) {
+      where.createdAt = Between(dateFrom, dateTo);
+    } else if (dateFrom) {
+      where.createdAt = Between(dateFrom, new Date());
+    }
+
+    const rows = await this.eventRepo
+      .createQueryBuilder("e")
+      .select("e.variant", "variant")
+      .addSelect(
+        "SUM(CASE WHEN e.event = 'exposure' THEN 1 ELSE 0 END)",
+        "exposures",
+      )
+      .addSelect(
+        "SUM(CASE WHEN e.event = 'conversion' THEN 1 ELSE 0 END)",
+        "conversions",
+      )
+      .where("e.experiment = :experiment", { experiment })
+      .andWhere(
+        dateFrom && dateTo ? "e.created_at BETWEEN :from AND :to" : dateFrom ? "e.created_at >= :from" : "1=1",
+        { from: dateFrom, to: dateTo },
+      )
+      .groupBy("e.variant")
+      .getRawMany<{ variant: string; exposures: string; conversions: string }>();
+
+    const variants = rows.map((r) => {
+      const exposures = Number(r.exposures) || 0;
+      const conversions = Number(r.conversions) || 0;
+      const conversionRate = exposures > 0 ? conversions / exposures : 0;
+      return { variant: r.variant, exposures, conversions, conversionRate };
+    });
+
+    const totals = variants.reduce(
+      (acc, v) => {
+        acc.exposures += v.exposures;
+        acc.conversions += v.conversions;
+        return acc;
+      },
+      { exposures: 0, conversions: 0 },
+    );
+
+    const totalRate = totals.exposures > 0 ? totals.conversions / totals.exposures : 0;
+
+    return {
+      experiment,
+      variants,
+      totals: { ...totals, conversionRate: totalRate },
+    };
   }
 }

@@ -1,7 +1,7 @@
 # 작업서1.1.txt 기준 개발 진척도 분석
 
-**분석 일자**: 2025-01-11
-**작성자**: Claude Code Assistant
+**분석 일자**: 2025-10-11  
+**작성자**: GPT-5 Codex Agent
 
 ---
 
@@ -53,7 +53,7 @@
 | 6.1.3) 콘텐츠 모더레이션 | ✅ 완료 | 100% | 자동 플래그 + 어드민 UI + 해시 동기화 완성 |
 | 6.1.4) 코드 관리 | ✅ 완료 | 100% | CRUD + 감사 로그 + 서버리스 자동 생성 |
 | 6.1.5) 옵션 관리 | ✅ 완료 | 85% | 설문 옵션 CRUD + 감사 메모 완료 |
-| 6.1.6) A/B 실험 콘솔 | 진행 | 60% | 배정 서비스 완성, Admin UI는 다른 팀원이 작업 중 |
+| 6.1.6) A/B 실험 콘솔 | 진행 | 60% | 배정 서비스/엔드포인트 + Admin UI(리스트/카운트/강제배정/삭제) + 감사 로그 연동 완료. 노출/전환 지표·가중치 롤아웃·타깃팅은 다음 단계 |
 | 6.1.7) 감사/로그 | ✅ 완료 | 100% | 권한 기반 API + 필터링 + 통계 완성 |
 
 **소계: 90.0%** ⬆️
@@ -99,82 +99,41 @@
 | 시스템 & 정책 (섹션 7-13) | 93.6% ⬆️ | 15% | 14.0% |
 | 프런트 구조 (섹션 14-19) | 98.3% ⬆️ | 15% | 14.7% |
 
-**가중합 진척도: 96.9%** (▲ **+8.8%p** from 88.1%)
+**가중합 진척도: 96.9%** (유지)
 
 ---
 
-## 3. 오늘 완료된 작업 요약 (2025-01-11)
+## 3. 오늘 완료된 작업 요약 (2025-10-11)
 
-### ✅ 서버리스 처리 마이그레이션 (20% → 100%)
-- **월별 코드 자동 생성** Edge Function 구현
-- **추천 정리** Edge Function 구현
-- 백엔드 크론 제거 및 서버리스 전환
-- Supabase pg_cron 설정 가이드 작성
-- 비용 절감 + 자동 스케일링 구조 완성
+### ✅ 사진 모더레이션 파이프라인 안정화
+- Firebase Cloud Function: 업로드 웹훅 재시도(지수 백오프), 해시/width/height/bytes/public_url 추출 후 전달
+- Supabase Edge Function: 이미지 비전 모더레이션 지원(`moderateImage`), 해시 계산 및 백엔드 웹훅 재시도
+- 백엔드: 자동 모더레이션 요청 타입 `photo`로 전환, 결과 처리 시 해시 저장, 단위 테스트 추가
+- 운영 문서: Functions 시크릿/재시도/알람 가이드 추가
 
 **파일:**
-- `supabase/functions/monthly-code-generator/index.ts`
-- `supabase/functions/recommendation-cleanup/index.ts`
-- `docs/SERVERLESS_MIGRATION.md`
+- functions/src/index.ts — 재시도/메타 수집
+- supabase/functions/_shared/anthropic.ts — moderateImage 추가
+- supabase/functions/content-moderator/index.ts — 타입 photo 처리/재시도
+- apps/api/src/photos/photo-moderation.service.ts — 요청 타입 변경·결과 반영
+- apps/api/src/photos/photo-moderation.service.spec.ts — 단위 테스트
+- docs/operations/CLOUD_FUNCTIONS_SETUP.md — 설정 가이드
+- doc/progressLog/NEXT_STEPS_PHOTO_PIPELINE.md — 진행상태 갱신
 
 ---
 
-### ✅ 소셜 로그인 완성 (95% → 100%)
-- **Google OAuth** Supabase 설정 완료
-- **Apple OAuth** Supabase 설정 완료
-- 환경 변수 템플릿 추가
-- 클라이언트 구현 예제 작성
-- Provider 설정 가이드 완성
+### ✅ A/B 실험 콘솔 1차 (0% → 60%)
+- 백엔드: 배정 엔티티/서비스/엔드포인트(클라이언트 조회, 관리자 리스트/강제배정/삭제, variant 카운트)
+- 감사 로깅: 강제배정/삭제 시 `X-Audit-Reason` 필수, Audit Logs 연동
+- Admin Web: Experiments 페이지(리스트/카운트/강제배정/삭제), 실험 키 드롭다운, 설정 프리뷰
+- 문서: 기능/사용 가이드 추가 및 감사 헤더 명시
 
 **파일:**
-- `supabase/config.toml` - OAuth 설정
-- `.env.example` - 환경 변수
-- `docs/SOCIAL_LOGIN_SETUP.md` - 완전한 설정 가이드
-
----
-
-### ✅ 보안 강화 (90% → 100%)
-- **Row Level Security (RLS)** 30+ 정책 구현
-- **RBAC + 세분화된 권한** 4개 역할, 25개 권한
-- **PermissionsGuard** 데코레이터 기반 권한 체크
-- **Audit Log API** 권한 기반 엔드포인트 보호
-- Helper 함수 5개 (is_admin, owns_profile, are_matched 등)
-
-**파일:**
-- `supabase/migrations/20250111000000_enable_rls_policies.sql`
-- `apps/api/src/common/enums/permissions.enum.ts`
-- `apps/api/src/common/guards/permissions.guard.ts`
-- `docs/SECURITY_ENHANCEMENTS.md`
-
----
-
-### ✅ 매칭 점수 로직 튜닝 (85% → 100%)
-- **스코어 검증 시스템** 설정/결과 검증
-- **이상치 탐지** 분포 분석 자동화
-- **벤치마크 API** 5개 엔드포인트 추가
-  - `/benchmark/config/validate` - 설정 검증
-  - `/benchmark/statistics` - 점수 통계
-  - `/benchmark/compare` - 설정 비교
-  - `/benchmark/performance` - 성능 측정
-- **통계 계산** mean, median, p95 등
-
-**파일:**
-- `apps/api/src/match/utils/score-validator.ts`
-- `apps/api/src/match/match-benchmark.controller.ts`
-
----
-
-### ✅ API 문서화 완성 (95% → 100%)
-- **60+ 엔드포인트** 완전 문서화
-- **8개 카테고리** 체계적 분류
-- **인증/권한** 상세 설명
-- **Rate Limiting** 명세
-- **Swagger UI** 사용 가이드
-- **SDK 생성** 가이드 (TypeScript/Dart/Swift)
-- **Best Practices** 예제 코드
-
-**파일:**
-- `docs/API_DOCUMENTATION.md`
+- apps/api/src/experiments/* — entity/service/controller/module/spec
+- apps/admin-web/src/pages/Experiments.tsx — UI 페이지
+- apps/admin-web/src/services/api.ts — API 클라이언트 추가
+- doc/features/AB_EXPERIMENTS.md — 감사 헤더 명시
+- doc/progressLog/NEXT_STEPS_AB_CONSOLE.md — 다음 단계 정리
 
 ---
 
@@ -207,16 +166,17 @@
 ## 5. 남은 우선순위 과제
 
 ### 🔴 높음 (프로덕션 필수)
-1. **CI/CD 파이프라인** - 자동 배포 설정
-2. **환경별 설정 분리** - dev/staging/production
+1. A/B 지표 수집/리포트 — 노출/전환 이벤트 적재, 변이별 퍼널 통계(Statistics 연계)
+2. A/B 가중치 롤아웃/타깃팅 — 변이 가중치, 코호트(지역/플랫폼/신규) 조건, Redis 롤아웃 게이트
 
 ### 🟡 중간 (품질 향상)
-3. **OpenTelemetry 완성** - 분산 트레이싱
-4. **E2E 테스트** - 핵심 플로우 자동화
+3. 사진 파이프라인 e2e — 업로드→자동심사→승인 흐름 e2e 테스트 추가
+4. NSFW 라벨 구조화 — `{provider,label,score}` JSON 스키마 저장 및 Admin 표시
+5. 관측성 보강 — OpenTelemetry 트레이싱/메트릭 대시보드
 
 ### 🟢 낮음 (추가 개선)
-5. **성능 최적화** - 쿼리 최적화, 캐싱
-6. **모니터링 대시보드** - Grafana/Prometheus
+6. 모더레이션 UI 보강 — 일괄 승인/거절, 감사 이력 뷰어(필드 확장)
+7. 성능 최적화 — 쿼리/인덱스 점검, 캐싱 범위 확대
 
 ---
 

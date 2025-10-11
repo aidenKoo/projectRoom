@@ -272,6 +272,22 @@ export async function fetchExperimentConfig(key: string) {
   return response.data;
 }
 
+export async function fetchAbStats(params: { experiment: string; dateFrom?: string; dateTo?: string }) {
+  const response = await api.get<{ experiment: string; variants: Array<{ variant: string; exposures: number; conversions: number; conversionRate: number }>; totals: { exposures: number; conversions: number; conversionRate: number } }>(
+    '/admin/experiments/stats',
+    { params }
+  );
+  return response.data;
+}
+
+export async function recordExperimentEvent(body: { experiment: string; event: 'exposure' | 'conversion'; variant?: string; properties?: Record<string, any> }) {
+  const response = await api.post<{ ok: true; id: number }>(
+    '/experiments/events',
+    body
+  );
+  return response.data;
+}
+
 export async function forceAbAssignment(body: { userId: number; experiment: string; variant: string }, auditReason: string) {
   const response = await api.post<AbAssignment>('/admin/experiments/assignments', body, {
     headers: { 'X-Audit-Reason': auditReason },
