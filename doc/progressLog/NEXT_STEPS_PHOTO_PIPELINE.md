@@ -30,10 +30,10 @@
    - ✅ Edge Function이 백엔드 Webhook으로 결과를 전달하도록 전환(2025-10-12 완료).
    - ✅ Storage 업로드 → `/internal/photos/storage/upload` webhook 경유로 자동 심사 요청(백엔드 엔드포인트 + Cloud Function 연계 완료).
    - 🔄 Cloud Function: 재시도(지수 백오프) 구현 완료, 알람은 GCP Log 기반 구성 필요. Secrets 설정 가이드 추가(docs/operations/CLOUD_FUNCTIONS_SETUP.md).
-  - 🔄 Cloud Function: 해시/메타데이터(width/height/bytes/public_url) 수집 및 전달 구현(백엔드 저장 경로 연동), 운영 환경 검증 필요.
+ - 🔄 Cloud Function: 해시/메타데이터(width/height/bytes/public_url) 수집 및 전달 구현(백엔드 저장 경로 연동), 운영 환경 검증 필요.
 2. **NSFW Auto Flow**
    - ✅ Edge Function이 `type: "photo"` 처리 시 이미지 비전 모더레이션 호출하도록 수정.
-   - [ ] 모더레이션 결과의 라벨/점수 구조화 저장(JSON: `{ provider, label, score }`).
+   - ✅ 모더레이션 결과의 라벨/점수 구조화 저장(JSON: `{ provider, label, score }`) + Admin UI 표시.
 3. **Admin UI Enhancements**
    - ✅ 상태·검색·날짜 필터 및 페이지네이션 추가(2025-10-12 완료).
    - [ ] Batch actions (approve/reject multiple).
@@ -42,8 +42,8 @@
    - Polling / subscriptions for moderation status changes (currently manual refresh).
    - Add tooltip explaining each status, highlight rejected items requiring replacement.
 5. **Testing**
-   - Add e2e test for photo upload → moderation queue.
-   - Unit tests for `PhotoModerationService` covering auto-flag, manual decision.
+   - ✅ e2e test: upload → 자동 모더레이션 결과 → 상태 업데이트 (`photo-pipeline.e2e.spec.ts`).
+   - Expand unit tests for `PhotoModerationService` covering manual decision edge cases.
 
 ## 4. Reference Paths
 - Backend:

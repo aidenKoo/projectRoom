@@ -15,6 +15,7 @@ import { Profile } from "../profiles/entities/profile.entity";
 import { ProfilePrivate } from "../profiles-private/entities/profile-private.entity";
 import { Preference } from "../preferences/entities/preference.entity";
 import { Conversation } from "../conversations/entities/conversation.entity";
+import { ExperimentsModule } from "../experiments/experiments.module";
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { Conversation } from "../conversations/entities/conversation.entity";
     ]),
     HttpModule,
     ConfigModule,
+    ExperimentsModule,
   ],
   controllers: [
     MatchController,

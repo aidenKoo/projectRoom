@@ -5,7 +5,11 @@ import { ConfigService } from "@nestjs/config";
 import { Repository } from "typeorm";
 import { firstValueFrom } from "rxjs";
 import { Photo } from "./entities/photo.entity";
-import { PhotoMeta, PhotoModerationStatus } from "./entities/photo-meta.entity";
+import {
+  ModerationLabel,
+  PhotoMeta,
+  PhotoModerationStatus,
+} from "./entities/photo-meta.entity";
 
 interface ModerationPayload {
   width?: number;
@@ -20,6 +24,7 @@ interface ModerationDecision {
   confidence?: number;
   reasons?: string[];
   severity?: "low" | "medium" | "high";
+  labels?: ModerationLabel[];
 }
 
 export interface ModerationQueueOptions {
@@ -166,14 +171,22 @@ export class PhotoModerationService {
     decision: PhotoModerationStatus.APPROVED | PhotoModerationStatus.REJECTED,
     reviewerId: string,
     notes?: string,
-    flaggedReason?: string[],
+    flaggedLabels?: (ModerationLabel | string)[],
   ): Promise<PhotoMeta> {
     meta.status = decision;
     meta.reviewedBy = reviewerId;
     meta.reviewedAt = new Date();
     meta.reviewNotes = notes ?? null;
-    if (flaggedReason?.length) {
-      meta.labels = flaggedReason;
+    if (flaggedLabels?.length) {
+      meta.labels = flaggedLabels.map<ModerationLabel>((entry) =>
+        typeof entry === "string"
+          ? { provider: "admin", label: entry, score: null }
+          : {
+              provider: entry.provider ?? "admin",
+              label: entry.label,
+              score: entry.score ?? null,
+            },
+      );
     }
     return this.photoMetaRepository.save(meta);
   }
@@ -181,15 +194,36 @@ export class PhotoModerationService {
   async markAutoFlagged(
     meta: PhotoMeta,
     nsfwScore?: number,
-    labels?: string[],
-    reasons?: string[],
+    labels?: ModerationLabel[] | null,
   ): Promise<PhotoMeta> {
     meta.status = PhotoModerationStatus.AUTO_FLAGGED;
     meta.nsfw = true;
     meta.nsfwScore = nsfwScore ?? null;
-    meta.labels = labels ?? reasons ?? null;
-    meta.reviewNotes = reasons?.join(", ").slice(0, 255) ?? null;
+    meta.labels = labels ?? null;
+    meta.reviewNotes =
+      labels?.map((entry) => entry.label).join(", ").slice(0, 255) ?? null;
     return this.photoMetaRepository.save(meta);
+  }
+
+  private normalizeLabels(
+    provider: string,
+    result: ModerationDecision,
+  ): ModerationLabel[] | null {
+    if (result.labels && result.labels.length > 0) {
+      return result.labels.map((label) => ({
+        provider: label.provider ?? provider,
+        label: label.label,
+        score: label.score ?? result.confidence ?? null,
+      }));
+    }
+    if (result.reasons && result.reasons.length > 0) {
+      return result.reasons.map((reason) => ({
+        provider,
+        label: reason,
+        score: result.confidence ?? null,
+      }));
+    }
+    return null;
   }
 
   async requestAutoModeration(
@@ -252,7 +286,8 @@ export class PhotoModerationService {
     meta.nsfw = Boolean(result.flagged);
     meta.nsfwScore =
       typeof result.confidence === "number" ? result.confidence : null;
-    meta.labels = result.reasons ?? null;
+    const labels = this.normalizeLabels("supabase_claude", result);
+    meta.labels = labels;
     meta.reviewNotes = null;
 
     // Update hash if provided from Cloud Function
@@ -265,8 +300,7 @@ export class PhotoModerationService {
       return this.markAutoFlagged(
         meta,
         meta.nsfwScore ?? undefined,
-        meta.labels ?? undefined,
-        result.reasons,
+        labels,
       );
     }
 

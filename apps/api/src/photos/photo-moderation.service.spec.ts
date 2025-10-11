@@ -71,7 +71,8 @@ describe("PhotoModerationService", () => {
     expect(updated.status).toBe(PhotoModerationStatus.AUTO_FLAGGED);
     expect(updated.nsfw).toBe(true);
     expect(updated.nsfwScore).toBe(0.92);
-    expect(updated.labels).toEqual(["nsfw"]);
+    expect(updated.labels).toEqual([
+      { provider: "supabase_claude", label: "nsfw", score: 0.92 },
+    ]);
   });
 });
-

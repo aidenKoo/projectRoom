@@ -118,6 +118,11 @@ async function callWebhookWithRetry(
 - `pending` → `approved` (안전한 콘텐츠)
 - `pending` → `auto_flagged` (의심스러운 콘텐츠, 수동 검토 필요)
 
+**라벨 구조**:
+- `labels` 필드는 `{ provider, label, score }` JSON 배열로 저장됩니다.
+- Claude 비전 결과는 `provider: "supabase_claude"`, `score = confidence` 형식으로 변환됩니다.
+- 관리자 수동 거절 시 `provider: "admin"` 라벨이 기록되어 감사 로그에 함께 남습니다.
+
 ## 설정
 
 ### 환경 변수
@@ -174,7 +179,7 @@ await storageRef.put(file, { customMetadata: metadata });
 | status | enum | pending/approved/rejected/auto_flagged |
 | nsfw | boolean | NSFW 여부 |
 | nsfw_score | decimal(5,4) | NSFW 신뢰도 (0-1) |
-| labels | json | 감지된 라벨 배열 |
+| labels | json | 감지된 라벨 배열 (`[{ provider, label, score }]`) |
 | review_notes | varchar(255) | 검토 메모 |
 | reviewed_by | varchar(64) | 검토자 ID |
 | reviewed_at | datetime | 검토 일시 |

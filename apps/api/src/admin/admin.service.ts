@@ -594,6 +594,7 @@ export class AdminService {
         status: updated.status,
         reviewer: auditContext.accessorId,
         notes: notes ?? null,
+        labels: updated.labels ?? [],
       },
     });
 

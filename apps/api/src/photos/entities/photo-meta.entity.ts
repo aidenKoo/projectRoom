@@ -10,6 +10,12 @@ import {
 } from "typeorm";
 import { Photo } from "./photo.entity";
 
+export interface ModerationLabel {
+  provider: string;
+  label: string;
+  score?: number | null;
+}
+
 export enum PhotoModerationStatus {
   PENDING = "pending",
   APPROVED = "approved",
@@ -63,7 +69,7 @@ export class PhotoMeta {
   nsfwScore?: number | null;
 
   @Column({ type: "json", nullable: true })
-  labels?: string[] | null;
+  labels?: ModerationLabel[] | null;
 
   @Column({ type: "varchar", length: 255, nullable: true })
   reviewNotes?: string | null;

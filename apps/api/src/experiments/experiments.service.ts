@@ -1,8 +1,32 @@
-import { Injectable } from "@nestjs/common";
+import { BadRequestException, Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Between, Repository } from "typeorm";
+import { Repository } from "typeorm";
 import { AbAssignment } from "./entities/ab-assignment.entity";
 import { AbEvent, AbEventType } from "./entities/ab-event.entity";
+import { AbExperiment } from "./entities/ab-experiment.entity";
+
+type VariantFilters = {
+  regions?: string[];
+  platforms?: string[];
+  newUserDays?: number;
+};
+
+type VariantConfig = {
+  key: string;
+  weight: number;
+  filters?: VariantFilters;
+};
+
+export type ExperimentConfig = {
+  defaultVariant: string;
+  variants: VariantConfig[];
+};
+
+export type AssignmentContext = {
+  regionCode?: string | null;
+  createdAt?: Date | null;
+  platform?: string | null;
+};
 
 @Injectable()
 export class ExperimentsService {
@@ -11,34 +35,165 @@ export class ExperimentsService {
     private readonly assignmentRepo: Repository<AbAssignment>,
     @InjectRepository(AbEvent)
     private readonly eventRepo: Repository<AbEvent>,
+    @InjectRepository(AbExperiment)
+    private readonly experimentRepo: Repository<AbExperiment>,
   ) {}
 
-  private stableVariant(
+  private configCache = new Map<string, ExperimentConfig>();
+
+  private matchesFilters(filters: VariantFilters | undefined, context: AssignmentContext): boolean {
+    if (!filters) return true;
+    if (filters.regions && filters.regions.length) {
+      const region = context.regionCode ?? undefined;
+      if (!region || !filters.regions.includes(region)) {
+        return false;
+      }
+    }
+    if (filters.platforms && filters.platforms.length) {
+      const platform = context.platform?.toLowerCase();
+      const normalized = filters.platforms.map((p) => p.toLowerCase());
+      if (!platform || !normalized.includes(platform)) {
+        return false;
+      }
+    }
+    if (filters.newUserDays && filters.newUserDays > 0) {
+      const createdAt = context.createdAt ?? undefined;
+      if (!createdAt) return false;
+      const diffMs = Date.now() - createdAt.getTime();
+      const limitMs = filters.newUserDays * 24 * 60 * 60 * 1000;
+      if (diffMs > limitMs) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private deterministicPick(
     userId: number,
     experiment: string,
-    variants: string[],
+    variants: VariantConfig[],
   ): string {
-    // Simple deterministic bucketing by hashing userId+experiment
+    const totalWeight = variants.reduce((sum, v) => sum + Math.max(v.weight, 0), 0);
+    if (!totalWeight || totalWeight <= 0) {
+      return variants[0]?.key ?? "A";
+    }
     const str = `${userId}:${experiment}`;
     let hash = 0;
     for (let i = 0; i < str.length; i++) {
-      hash = (hash * 31 + str.charCodeAt(i)) >>> 0; // unsigned
+      hash = (hash * 31 + str.charCodeAt(i)) >>> 0;
     }
-    return variants[hash % Math.max(1, variants.length)] || variants[0];
+    const normalized = (hash % 10000) / 10000; // 0-0.9999
+    let cumulative = 0;
+    for (const variant of variants) {
+      const weight = Math.max(variant.weight, 0) / totalWeight;
+      cumulative += weight;
+      if (normalized <= cumulative + 1e-8) {
+        return variant.key;
+      }
+    }
+    return variants[variants.length - 1]?.key ?? "A";
+  }
+
+  private filterEligibleVariants(
+    config: ExperimentConfig,
+    allowedKeys: string[] | undefined,
+    context: AssignmentContext,
+  ): VariantConfig[] {
+    const keysSet = allowedKeys && allowedKeys.length ? new Set(allowedKeys) : null;
+    return config.variants.filter((variant) => {
+      if (keysSet && !keysSet.has(variant.key)) {
+        return false;
+      }
+      return this.matchesFilters(variant.filters, context);
+    });
+  }
+
+  private fallbackVariant(config: ExperimentConfig | null, variants: string[]): string {
+    if (config?.defaultVariant) return config.defaultVariant;
+    if (variants.length > 0) return variants[0];
+    return "A";
+  }
+
+  private async getConfig(experiment: string): Promise<ExperimentConfig | null> {
+    if (this.configCache.has(experiment)) {
+      return this.configCache.get(experiment)!;
+    }
+    const record = await this.experimentRepo.findOne({ where: { experiment } });
+    if (!record) return null;
+    const config = record.config as ExperimentConfig;
+    if (!config || !Array.isArray(config.variants)) {
+      return null;
+    }
+    this.configCache.set(experiment, config);
+    return config;
+  }
+
+  async upsertConfig(experiment: string, config: ExperimentConfig): Promise<ExperimentConfig> {
+    if (!config?.variants?.length) {
+      throw new BadRequestException("variants must not be empty");
+    }
+    if (!config.variants.some((v) => v.key === config.defaultVariant)) {
+      throw new BadRequestException("defaultVariant must exist in variants");
+    }
+    const totalWeight = config.variants.reduce((sum, variant) => sum + Math.max(variant.weight, 0), 0);
+    if (totalWeight <= 0) {
+      throw new BadRequestException("Sum of variant weights must be greater than zero");
+    }
+    await this.experimentRepo.upsert({ experiment, config: config as any }, ["experiment"]);
+    this.configCache.set(experiment, config);
+    return config;
+  }
+
+  async getConfigRaw(experiment: string): Promise<ExperimentConfig | null> {
+    const config = await this.getConfig(experiment);
+    return config ?? null;
   }
 
   async getOrAssign(
     userId: number,
     experiment: string,
     variants: string[] = ["A", "B"],
+    context: AssignmentContext = {},
   ): Promise<AbAssignment> {
     let existing = await this.assignmentRepo.findOne({
       where: { userId, experiment },
     });
-    if (existing) return existing;
 
-    const variant = this.stableVariant(userId, experiment, variants);
-    const created = this.assignmentRepo.create({ userId, experiment, variant });
+    const config = await this.getConfig(experiment);
+
+    let variantPool: VariantConfig[] = [];
+    if (config) {
+      const allowedSet = variants && variants.length ? new Set(variants) : null;
+      const base = config.variants.filter((variant) =>
+        !allowedSet || allowedSet.has(variant.key),
+      );
+      const eligible = this.filterEligibleVariants(config, variants, context);
+      if (eligible.length > 0) {
+        variantPool = eligible;
+      } else if (base.length > 0) {
+        variantPool = base;
+      } else if (config.variants.length > 0) {
+        variantPool = config.variants;
+      }
+    }
+
+    if (variantPool.length === 0) {
+      const allowed = variants.length > 0 ? variants : ["A", "B"];
+      variantPool = allowed.map((key) => ({ key, weight: 1 } as VariantConfig));
+    }
+
+    const selectedVariant = this.deterministicPick(userId, experiment, variantPool);
+    const finalVariant = selectedVariant || this.fallbackVariant(config, variants);
+
+    if (existing) {
+      if (existing.variant !== finalVariant) {
+        existing.variant = finalVariant;
+        return this.assignmentRepo.save(existing);
+      }
+      return existing;
+    }
+
+    const created = this.assignmentRepo.create({ userId, experiment, variant: finalVariant });
     return this.assignmentRepo.save(created);
   }
 
@@ -121,6 +276,24 @@ export class ExperimentsService {
     return this.eventRepo.save(created);
   }
 
+  async recordConversionForUser(
+    userId: number,
+    properties?: Record<string, any>,
+  ): Promise<void> {
+    const assignments = await this.assignmentRepo.find({ where: { userId } });
+    await Promise.all(
+      assignments.map((assignment) =>
+        this.recordEvent(
+          userId,
+          assignment.experiment,
+          assignment.variant,
+          "conversion",
+          properties,
+        ),
+      ),
+    );
+  }
+
   async getStats(
     experiment: string,
     dateFrom?: Date,
@@ -130,13 +303,6 @@ export class ExperimentsService {
     variants: Array<{ variant: string; exposures: number; conversions: number; conversionRate: number }>;
     totals: { exposures: number; conversions: number; conversionRate: number };
   }> {
-    const where: any = { experiment };
-    if (dateFrom && dateTo) {
-      where.createdAt = Between(dateFrom, dateTo);
-    } else if (dateFrom) {
-      where.createdAt = Between(dateFrom, new Date());
-    }
-
     const rows = await this.eventRepo
       .createQueryBuilder("e")
       .select("e.variant", "variant")

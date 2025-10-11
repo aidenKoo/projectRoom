@@ -87,7 +87,7 @@ export type ModerationPhotoRecord = {
   status: 'pending' | 'approved' | 'rejected' | 'auto_flagged';
   nsfw: boolean;
   nsfwScore?: number | null;
-  labels: string[];
+  labels: ModerationLabel[];
   reviewNotes?: string | null;
   reviewedAt?: string | null;
   reviewedBy?: string | null;
@@ -108,6 +108,12 @@ export type ModerationPhotoRecord = {
     isPrimary?: boolean;
     createdAt?: string;
   };
+};
+
+export type ModerationLabel = {
+  provider: string;
+  label: string;
+  score?: number | null;
 };
 
 export type PaginationMeta = {
@@ -265,7 +271,7 @@ export async function fetchAvailableExperiments() {
   return response.data;
 }
 
-export async function fetchExperimentConfig(key: string) {
+export async function fetchMatchExperimentConfig(key: string) {
   const response = await api.get<{ experimentKey: string; config: Record<string, any>; isDefault: boolean }>(
     `/admin/match/config/experiments/${encodeURIComponent(key)}`
   );
@@ -284,6 +290,21 @@ export async function recordExperimentEvent(body: { experiment: string; event: '
   const response = await api.post<{ ok: true; id: number }>(
     '/experiments/events',
     body
+  );
+  return response.data;
+}
+
+export async function fetchExperimentRolloutConfig(experiment: string) {
+  const response = await api.get<{ experiment: string; config: any }>(
+    `/admin/experiments/config/${encodeURIComponent(experiment)}`
+  );
+  return response.data;
+}
+
+export async function updateExperimentRolloutConfig(experiment: string, payload: any) {
+  const response = await api.put<{ experiment: string; config: any }>(
+    `/admin/experiments/config/${encodeURIComponent(experiment)}`,
+    payload
   );
   return response.data;
 }

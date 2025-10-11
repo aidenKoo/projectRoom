@@ -12,3 +12,10 @@ CREATE TABLE IF NOT EXISTS ab_events (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 COMMENT='A/B experiment events (exposure, conversion)';
 
+CREATE TABLE IF NOT EXISTS ab_experiments (
+  experiment VARCHAR(40) PRIMARY KEY,
+  config JSON NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+COMMENT='A/B experiment rollout configuration (weights, cohorts)';

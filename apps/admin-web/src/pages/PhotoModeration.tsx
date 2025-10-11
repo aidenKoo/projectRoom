@@ -31,6 +31,7 @@ import type {
   AuditLogEntry,
   ModerationPhotoRecord,
   ModerationPhotoResponse,
+  ModerationLabel,
 } from '../services/api';
 
 const { Title, Text } = Typography;
@@ -114,6 +115,16 @@ const renderDetailValue = (value: unknown): string => {
     }
   }
   return String(value);
+};
+
+const formatLabels = (labels?: ModerationLabel[] | null): string => {
+  if (!labels || labels.length === 0) return '';
+  return labels
+    .map((entry) => {
+      const score = entry.score != null ? `${Math.round(entry.score * 100)}%` : undefined;
+      return score ? `${entry.label} (${score})` : entry.label;
+    })
+    .join(', ');
 };
 
 const PhotoModeration: React.FC = () => {
@@ -363,7 +374,7 @@ const PhotoModeration: React.FC = () => {
               <Text type="secondary">Notes: {record.reviewNotes}</Text>
             )}
             {record.labels && record.labels.length > 0 && (
-              <Text type="secondary">Labels: {record.labels.join(', ')}</Text>
+              <Text type="secondary">Labels: {formatLabels(record.labels)}</Text>
             )}
           </Space>
         ),
@@ -513,9 +524,14 @@ const PhotoModeration: React.FC = () => {
                   renderItem={(item) => {
                     const details = (item.details ?? {}) as Record<string, unknown>;
                     const notesText = details.notes ? renderDetailValue(details.notes) : '';
-                    const labelsText = Array.isArray(details.labels)
-                      ? renderDetailValue(details.labels)
-                      : '';
+                    let labelsText = '';
+                    if (Array.isArray(details.labels)) {
+                      if (details.labels.length > 0 && typeof details.labels[0] === 'string') {
+                        labelsText = (details.labels as string[]).join(', ');
+                      } else {
+                        labelsText = formatLabels(details.labels as ModerationLabel[]);
+                      }
+                    }
 
                     return (
                       <List.Item>

@@ -5,12 +5,14 @@ import {
   BadRequestException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, LessThan } from "typeorm";
+import { Repository } from "typeorm";
 import { Like } from "./entities/like.entity";
 import { Match } from "./entities/match.entity";
 import { Recommendation } from "./entities/recommendation.entity";
 import { MatchScorerService } from "./match-scorer.service";
 import { Conversation } from "../conversations/entities/conversation.entity";
+import { User } from "../users/entities/user.entity";
+import { ExperimentsService } from "../experiments/experiments.service";
 
 @Injectable()
 export class MatchService {
@@ -23,8 +25,16 @@ export class MatchService {
     private readonly recommendationRepository: Repository<Recommendation>,
     @InjectRepository(Conversation)
     private readonly conversationRepository: Repository<Conversation>,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
     private readonly scorerService: MatchScorerService,
+    private readonly experimentsService: ExperimentsService,
   ) {}
+
+  private async resolveUserId(firebaseUid: string): Promise<number | null> {
+    const user = await this.userRepository.findOne({ where: { firebase_uid: firebaseUid } });
+    return user?.id ?? null;
+  }
 
   // Like 생성 및 상호 매칭 확인
   async createLike(
@@ -72,7 +82,21 @@ export class MatchService {
     }
 
     const match = this.matchRepository.create({ uidA, uidB });
-    return this.matchRepository.save(match);
+    const saved = await this.matchRepository.save(match);
+
+    const [userAId, userBId] = await Promise.all([
+      this.resolveUserId(uidA),
+      this.resolveUserId(uidB),
+    ]);
+    const properties = { source: "match", uidA, uidB };
+    if (userAId) {
+      await this.experimentsService.recordConversionForUser(userAId, properties);
+    }
+    if (userBId) {
+      await this.experimentsService.recordConversionForUser(userBId, properties);
+    }
+
+    return saved;
   }
 
   // ID로 매치 조회 (권한 확인 포함)

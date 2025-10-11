@@ -24,8 +24,26 @@ export class ModerationResultDto {
   reasons?: string[];
 
   @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ModerationLabelDto)
+  labels?: ModerationLabelDto[];
+
+  @IsOptional()
   @IsIn(["low", "medium", "high"])
   severity?: "low" | "medium" | "high";
+}
+
+export class ModerationLabelDto {
+  @IsString()
+  provider: string;
+
+  @IsString()
+  label: string;
+
+  @IsOptional()
+  @IsNumber()
+  score?: number;
 }
 
 export class ModerationWebhookDto {

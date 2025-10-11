@@ -56,11 +56,29 @@ export async function analyzeProfile(
   throw new Error("Unexpected response format");
 }
 
+export interface ModerationLabel {
+  provider: string;
+  label: string;
+  score?: number;
+}
+
 export interface ModerationResult {
   flagged: boolean;
   confidence: number;
   reasons: string[];
   severity: "low" | "medium" | "high";
+  labels?: ModerationLabel[];
+}
+
+function ensureLabels(result: any): ModerationResult {
+  if (!result.labels && Array.isArray(result.reasons)) {
+    result.labels = result.reasons.map((reason: string) => ({
+      provider: "claude",
+      label: reason,
+      score: result.confidence ?? null,
+    }));
+  }
+  return result as ModerationResult;
 }
 
 export async function moderateContent(
@@ -97,7 +115,8 @@ JSON 형식으로 응답:
 
   const content_resp = message.content[0];
   if (content_resp.type === "text") {
-    return JSON.parse(content_resp.text);
+    const parsed = JSON.parse(content_resp.text);
+    return ensureLabels(parsed);
   }
 
   throw new Error("Unexpected response format");
@@ -134,7 +153,8 @@ export async function moderateImage(imageUrl: string): Promise<ModerationResult>
 
   const content = message.content[0];
   if (content.type === "text") {
-    return JSON.parse(content.text);
+    const parsed = JSON.parse(content.text);
+    return ensureLabels(parsed);
   }
   throw new Error("Unexpected response format for image moderation");
 }

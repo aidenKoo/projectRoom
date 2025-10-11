@@ -1,13 +1,13 @@
-import { Controller, Get, Query, UseGuards, Post, Body, Delete, Param, Request, Headers, BadRequestException } from "@nestjs/common";
+import { Controller, Get, Query, UseGuards, Post, Body, Delete, Param, Request, Headers, BadRequestException, Put } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { ExperimentsService } from "./experiments.service";
 import { FirebaseAuthGuard } from "../common/guards/firebase-auth.guard";
 import { AdminGuard } from "../common/guards/admin.guard";
 import { ForceAssignDto, ListAssignmentsQueryDto } from "./dto/assign.dto";
+import { UpdateExperimentConfigDto } from "./dto/config.dto";
 import { UsersService } from "../users/users.service";
 import { AuditLogsService } from "../audit-logs/audit-logs.service";
 import { AuditAction } from "../audit-logs/entities/audit-log.entity";
-import { IsIn, IsOptional, IsString } from "class-validator";
 
 @ApiTags("experiments")
 @Controller()
@@ -28,6 +28,7 @@ export class ExperimentsController {
     @Query("experiment") experiment: string,
     @Query("variants") variantsQuery?: string | string[],
     @Query("record") record?: string,
+    @Query("platform") platform?: string,
   ) {
     const firebaseUid = req.user.uid;
     const user = await this.usersService.findByFirebaseUid(firebaseUid);
@@ -36,7 +37,15 @@ export class ExperimentsController {
       if (Array.isArray(variantsQuery)) variants = variantsQuery as string[];
       else if (typeof variantsQuery === "string") variants = variantsQuery.split(",").map((v) => v.trim()).filter(Boolean);
     }
-    const a = await this.experimentsService.getOrAssign(user.id, experiment, variants);
+    const regionCode = (user as any).region_code ?? (user as any).regionCode ?? null;
+    const createdAtRaw = (user as any).created_at ?? (user as any).createdAt ?? null;
+    const createdAt = createdAtRaw ? new Date(createdAtRaw) : null;
+    const context = {
+      regionCode,
+      createdAt,
+      platform: platform ?? null,
+    };
+    const a = await this.experimentsService.getOrAssign(user.id, experiment, variants, context);
     if (record === "1" || record === "true") {
       await this.experimentsService.recordEvent(user.id, experiment, a.variant, "exposure");
     }
@@ -55,6 +64,27 @@ export class ExperimentsController {
       page: query.page,
       limit: query.limit,
     });
+  }
+
+  @Get("admin/experiments/config/:experiment")
+  @UseGuards(FirebaseAuthGuard, AdminGuard)
+  @ApiBearerAuth("firebase")
+  @ApiOperation({ summary: "Get experiment rollout config" })
+  async getConfig(@Param("experiment") experiment: string) {
+    const config = await this.experimentsService.getConfigRaw(experiment);
+    return { experiment, config }; // config can be null
+  }
+
+  @Put("admin/experiments/config/:experiment")
+  @UseGuards(FirebaseAuthGuard, AdminGuard)
+  @ApiBearerAuth("firebase")
+  @ApiOperation({ summary: "Upsert experiment rollout config" })
+  async updateConfig(
+    @Param("experiment") experiment: string,
+    @Body() body: UpdateExperimentConfigDto,
+  ) {
+    const saved = await this.experimentsService.upsertConfig(experiment, body);
+    return { experiment, config: saved };
   }
 
   @Get("admin/experiments/variants")

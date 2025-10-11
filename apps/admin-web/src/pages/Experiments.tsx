@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button, Card, Col, Form, Input, Modal, Row, Select, Space, Statistic, Table, Tag, Typography, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { fetchAbAssignments, fetchAbVariantCounts, forceAbAssignment, deleteAbAssignment, fetchAvailableExperiments, fetchExperimentConfig, fetchAbStats } from '../services/api';
+import { fetchAbAssignments, fetchAbVariantCounts, forceAbAssignment, deleteAbAssignment, fetchAvailableExperiments, fetchMatchExperimentConfig, fetchAbStats, fetchExperimentRolloutConfig, updateExperimentRolloutConfig } from '../services/api';
 import type { AbAssignment } from '../services/api';
 
 const { Title, Text } = Typography;
@@ -12,6 +12,9 @@ const Experiments: React.FC = () => {
   const [experimentKey, setExperimentKey] = useState<string>('recencyBoost');
   const [availableExps, setAvailableExps] = useState<string[]>([]);
   const [configPreview, setConfigPreview] = useState<Record<string, any> | null>(null);
+  const [configModalOpen, setConfigModalOpen] = useState(false);
+  const [configJson, setConfigJson] = useState('');
+  const [configSaving, setConfigSaving] = useState(false);
   const [variantFilter, setVariantFilter] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState<boolean>(false);
   const [assignments, setAssignments] = useState<AbAssignment[]>([]);
@@ -72,7 +75,7 @@ const Experiments: React.FC = () => {
     // load config preview
     (async () => {
       try {
-        const res = await fetchExperimentConfig(experimentKey);
+        const res = await fetchMatchExperimentConfig(experimentKey);
         setConfigPreview(res.config || null);
       } catch {
         setConfigPreview(null);
@@ -132,6 +135,16 @@ const Experiments: React.FC = () => {
             onChange={(v) => setVariantFilter(v)}
           />
           <Button type="primary" onClick={() => setForceOpen(true)}>Force Assign</Button>
+          <Button onClick={async () => {
+            try {
+              const res = await fetchExperimentRolloutConfig(experimentKey);
+              const payload = res.config ?? { defaultVariant: 'A', variants: [{ key: 'A', weight: 1 }] };
+              setConfigJson(JSON.stringify(payload, null, 2));
+              setConfigModalOpen(true);
+            } catch (e: any) {
+              message.error(`Failed to load rollout config: ${e?.message || e}`);
+            }
+          }}>Edit Rollout</Button>
         </Space>
       </Card>
 
@@ -251,6 +264,42 @@ const Experiments: React.FC = () => {
           <Text>Provide audit reason for deletion.</Text>
           <Input value={deleteReason} onChange={(e) => setDeleteReason(e.target.value)} maxLength={255} />
         </Space>
+      </Modal>
+
+      <Modal
+        title="Rollout Config"
+        open={configModalOpen}
+        onCancel={() => setConfigModalOpen(false)}
+        okText="Save"
+        confirmLoading={configSaving}
+        width={720}
+        onOk={async () => {
+          try {
+            const parsed = JSON.parse(configJson);
+            setConfigSaving(true);
+            await updateExperimentRolloutConfig(experimentKey, parsed);
+            message.success('Rollout config saved');
+            setConfigModalOpen(false);
+            setConfigSaving(false);
+            loadCounts(experimentKey);
+            loadStats(experimentKey);
+            loadAssignments(pagination.current, pagination.pageSize, experimentKey, variantFilter);
+          } catch (e: any) {
+            setConfigSaving(false);
+            if (e?.name === 'SyntaxError') {
+              message.error('Invalid JSON');
+            } else {
+              message.error(`Failed to save config: ${e?.message || e}`);
+            }
+          }
+        }}
+      >
+        <Input.TextArea
+          value={configJson}
+          onChange={(e) => setConfigJson(e.target.value)}
+          autoSize={{ minRows: 12 }}
+          spellCheck={false}
+        />
       </Modal>
     </Space>
   );

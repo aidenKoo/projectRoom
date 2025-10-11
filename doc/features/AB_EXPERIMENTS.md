@@ -55,6 +55,46 @@ Entity: `apps/api/src/experiments/entities/ab-assignment.entity.ts`
   - Auth: Admin
   - Returns variant-level exposures, conversions, and conversion rate.
 
+### Rollout Config
+
+- GET `admin/experiments/config/:experiment`
+  - Auth: Admin
+  - Returns `{ experiment, config }`. `config` may be `null` when defaulting to legacy 50/50 hash.
+
+- PUT `admin/experiments/config/:experiment`
+  - Auth: Admin
+  - Body:
+
+```json
+{
+  "defaultVariant": "A",
+  "variants": [
+    { "key": "A", "weight": 0.4 },
+    { "key": "B", "weight": 0.6, "filters": { "platforms": ["ios"], "regions": ["SEOUL_GANGNAM"], "newUserDays": 30 } }
+  ]
+}
+```
+
+- Variants
+  - `weight`: positive number; normalized automatically per eligible cohort.
+  - `filters` (optional): restrict rollout to specific `regions`, `platforms`, or `newUserDays` (days since signup).
+- Assignment behavior
+  - Variants whose filters match the user + optional `platform` query participate in weighted deterministic bucketing.
+  - If no variant matches filters, fallback to filtered variants without cohort or `defaultVariant`.
+
+### Automatic Conversions
+
+- `MatchService.createMatch` triggers conversions for both participants
+  - Resolves numeric userId and records `conversion` for every active experiment assignment.
+  - Event properties: `{ source: 'match', uidA, uidB }`.
+
+### Admin UI
+
+- Experiments page (`/experiments`)
+  - Displays variant counts + exposure/conversion stats + preview of scoring config.
+  - `Edit Rollout` button opens JSON editor for weights/cohort filters.
+  - Force assign / delete actions require `X-Audit-Reason` and log to audit trail.
+
 ## Related
 
 - Matching configs for experiments: `apps/api/src/match/config/scoring-config.ts`
