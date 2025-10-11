@@ -24,7 +24,7 @@ const Experiments: React.FC = () => {
   const [availableExps, setAvailableExps] = useState<string[]>([]);
   const [configPreview, setConfigPreview] = useState<Record<string, any> | null>(null);
   const [configModalOpen, setConfigModalOpen] = useState(false);
-  const [configJson, setConfigJson] = useState('');
+  const [configForm] = Form.useForm<{ configJson: string; auditReason: string }>();
   const [configSaving, setConfigSaving] = useState(false);
   const [variantFilter, setVariantFilter] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState<boolean>(false);
@@ -271,7 +271,10 @@ const Experiments: React.FC = () => {
             try {
               const res = await fetchExperimentRolloutConfig(experimentKey);
               const payload = res.config ?? { defaultVariant: 'A', variants: [{ key: 'A', weight: 1 }] };
-              setConfigJson(JSON.stringify(payload, null, 2));
+              configForm.setFieldsValue({
+                configJson: JSON.stringify(payload, null, 2),
+                auditReason: '',
+              });
               setConfigModalOpen(true);
             } catch (e: any) {
               message.error(`Failed to load rollout config: ${e?.message || e}`);
@@ -513,31 +516,46 @@ const Experiments: React.FC = () => {
         width={720}
         onOk={async () => {
           try {
-            const parsed = JSON.parse(configJson);
+            const values = await configForm.validateFields();
+            let parsed;
+            try {
+              parsed = JSON.parse(values.configJson);
+            } catch (e: any) {
+              message.error(`Invalid JSON: ${e?.message || e}`);
+              return;
+            }
             setConfigSaving(true);
-            await updateExperimentRolloutConfig(experimentKey, parsed);
+            await updateExperimentRolloutConfig(experimentKey, parsed, values.auditReason);
             message.success('Rollout config saved');
             setConfigModalOpen(false);
             setConfigSaving(false);
+            configForm.resetFields();
             loadCounts(experimentKey);
             loadStats(experimentKey);
             loadAssignments(pagination.current, pagination.pageSize, experimentKey, variantFilter);
           } catch (e: any) {
             setConfigSaving(false);
-            if (e?.name === 'SyntaxError') {
-              message.error('Invalid JSON');
-            } else {
-              message.error(`Failed to save config: ${e?.message || e}`);
-            }
+            if (e?.errorFields) return;
+            message.error(`Failed to save config: ${e?.message || e}`);
           }
         }}
       >
-        <Input.TextArea
-          value={configJson}
-          onChange={(e) => setConfigJson(e.target.value)}
-          autoSize={{ minRows: 12 }}
-          spellCheck={false}
-        />
+        <Form form={configForm} layout="vertical">
+          <Form.Item
+            name="configJson"
+            label="Rollout Config JSON"
+            rules={[{ required: true, message: 'Provide config JSON' }]}
+          >
+            <Input.TextArea autoSize={{ minRows: 12 }} spellCheck={false} placeholder="{ ... }" />
+          </Form.Item>
+          <Form.Item
+            name="auditReason"
+            label="Audit Reason"
+            rules={[{ required: true, message: 'Provide audit reason' }]}
+          >
+            <Input.TextArea rows={3} maxLength={255} placeholder="Reason for rollout update" />
+          </Form.Item>
+        </Form>
       </Modal>
 
       <Modal

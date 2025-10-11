@@ -329,10 +329,13 @@ export async function fetchExperimentRolloutConfig(experiment: string) {
   return response.data;
 }
 
-export async function updateExperimentRolloutConfig(experiment: string, payload: any) {
+export async function updateExperimentRolloutConfig(experiment: string, payload: any, auditReason: string) {
   const response = await api.put<{ experiment: string; config: any }>(
     `/admin/experiments/config/${encodeURIComponent(experiment)}`,
-    payload
+    payload,
+    {
+      headers: { 'X-Audit-Reason': auditReason },
+    }
   );
   return response.data;
 }
