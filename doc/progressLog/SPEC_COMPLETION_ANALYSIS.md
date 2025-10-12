@@ -164,10 +164,12 @@
 - 백엔드: `/analytics/dashboard`에 유저/매칭/메시지/모더레이션/실험 요약 포함, 코호트별 전환 집계
 - 새 API: `getModerationSummary`, `getExperimentOverview`로 사진·실험 통계 제공
 - Admin Web: 대시보드 카드 재구성(사용자/매칭/메시징/모더레이션/실험), 매칭률 추세·실험 성과 테이블 추가
+- 매칭 큐/사진 모더레이션 화면에서 **요청자·피요청자** 정보와 업로드 이력/상태/라벨/감사 로그를 즉시 확인, 검색/필터링 가능
 
 **파일:**
 - apps/api/src/analytics/analytics.service.ts, analytics.module.ts
 - apps/admin-web/src/pages/Dashboard.tsx
+- apps/admin-web/src/pages/MatchMonitoring.tsx, PhotoModeration.tsx
 
 ---
 
