@@ -20,7 +20,7 @@ void main() async {
 
     // Connect to Firebase Emulator in development mode
     if (kIsWeb) {
-      const useEmulator = true; // Set to false for production
+      const useEmulator = false; // Temporarily disabled for debugging
       if (useEmulator) {
         print('🔧 Connecting to Firebase Emulator...');
         await FirebaseAuth.instance.useAuthEmulator('localhost', 9099);
