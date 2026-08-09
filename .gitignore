@@ -84,3 +84,6 @@ memo
 
 # Large binary files
 *.deb
+# Local-only tooling
+.claude/settings.local.json
+.devcontainer/flutter/

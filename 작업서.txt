@@ -1,0 +1,321 @@
+Human:
+Flutter + Google Cloud Firestore 기반의 소개팅 앱을 만들려 해. 다음 요구사항을 충족하는 전체 Flutter 프로젝트 구조, 코드 스켈레톤, Cloud Functions 및 배포 계획도 출력해줘.
+📌 요구사항:
+1) **개발 환경**
+- GitHub Codespaces 기반 devcontainer (Flutter SDK 이미 포함)
+- `flutterfire configure` 로 `firebase_options.dart` 자동 생성 포함
+- `continue` 또는 `clair` 루틴으로 Claude AI 기반 소스 생성 흐름
+2) **Firestore 컬렉션 설계**
+- `users/{uid}`:
+   - `age`: number
+   - `job`: string
+   - `traits` (Big Five):
+     - `agreeableness`, `conscientiousness`, `extraversion`, `openness`, `emotionalStability` (각 1~5 점수)
+   - `lifestyle`: [string] (관심사 리스트)
+   - `relationshipGoals`: string
+   - `photoUrls`: [string] (최소 1장~최대 5장 Cloud Storage URL)
+- `matches/{matchId}`:
+   - `fromUid`, `toUid`: string
+   - `score`: number (1~100)
+   - `timestamp`: Timestamp
+- `notifications/{notifId}`:
+   - `toUid`, `fromUid`, `matchId`: string
+   - `type`: string (예: "topMatch")
+   - `timestamp`: Timestamp
+   - `content`: string (푸시 알림 메시지)
+3) **초기 설문 UI** (big 5 성향 + 기본 정보 + 취미 + 사진 업로드)
+- 사용자가 가입 시 Age, Job, Relationship Goals, Lifestyle (multiple choice), Big Five 점수(5‑point Likert scale), 사진 최대 5장 업로드
+- 설문 화면이 끝나면 사용자 도큐먼트 `users/{uid}`에 저장
+4) **매칭/추천 알고리즘**
+- traits 기반 유사도 계산 (e.g. dot product 또는 cosine similarity)
+- lifestyle 중복 개수에 소수점 가중치 추가
+- 계산된 score(1~100)를 `matches`에 저장
+- 매칭된 상위 10명은 앱 내부 `MatchListScreen` UI에 스코어 순 정렬해 보여주기
+5) **FCM 푸시 알림 구현**
+- Cloud Function (Node.js/TS)으로 `matches/` 새 도큐 생성 시 트리거
+- 매칭이 `score >= 80`인 경우 FCM 데이터 메시지로 상대방(`toUid`) 푸시 전송
+- 클라이언트 Flutter 앱에서 데이터 메시지를 수신해 내부 `notifications` 컬렉션과 알림 UI에 동기화
+- 알림 화면은 Instagram DM 스타일(채팅 목록 UI)
+6) **Flutter 폴더 구조 (feature-first 스타일)**
+lib/models/user.dartmatch.dartnotification.dartservices/auth_service.dartfirestore_service.dartmatch_service.dartnotification_service.dartscreens/signup_screen.dartsurvey_screen.dartmatch_list_screen.dartnotification_screen.dartwidgets/photo_uploader.darttrait_slider.dartmatch_card.dart
+7) **주요 코드 스켈레톤**
+- `user.dart`: 모델 클래스
+- `survey_screen.dart`: 폼 UI + Firebase 저장
+- `match_service.dart`: traits 유사도 함수 + Firestore 저장
+- `notification_service.dart`: 알림 UI + Firestore 스트림
+- `functions/index.ts`: Firestore trigger + FCM notify 로직
+8) **개발 단계 플랜 (phase 1~4)**
+- **Phase 1**: Codespace 초기세팅 → FlutterFire initialize → 가입/설문 UI
+- **Phase 2**: traits 기반 매칭 로직 구현 및 Firestore `matches` 저장
+- **Phase 3**: Cloud Function 구현 → FCM 푸시 전송
+- **Phase 4**: 알림 UI 연동 → 테스트 및 배포 (iOS/Android/웹)
+이 스펙에 맞춰 **전체 폴더 트리, 주요 파일 코드 스켈레톤, Cloud Function 예시, 단계별 개발 플랜**을 출력해줘. Claude Code 또는 Cline/Continue 확장 UI에서 한 번에 수행 가능하도록 prompt에 **<generate‑project>** 식으로 실행 키워드를 포함해줘.
+소개팅 웹앱 – 통합 개발 문서 (Claude 작업용)
+0) 목표/범위/원칙
+목표: 공개·비공개 설문 기반의 상호(Reciprocal) 매칭, 월/동시 한도 규칙, 외모 추정지표(UX 비노출), 평점/블랙, Admin 콘솔까지 포함한 풀스택 웹앱.
+범위: 회원관리, 피드/매칭, 채팅/전화번호 권한, 종료/평점, 리더보드, 외모 점수(내부), Admin(RBAC/모니터링/정책), 배치 잡.
+원칙
+공개/비공개 데이터 엄격 분리.
+매칭 점수 0~100(내 선호 + 상대의 ‘나에 대한’ 선호 예측의 상호결합).
+외모 영향은 내부만 사용 + 최종 재랭킹 최대 15% 캡.
+한도(시도/성공/동시)는 요청·수락 단계 모두에서 트랜잭션으로 강제.
+사용자에게 상처되는 표현 금지, 긍정적 카피 우선.
+1) 사용자 플로우/정책
+1.1 가입/로그인
+가입 접근: 추천인 이름(선택) + 월 가입코드(필수, 해당 YYYYMM만 유효).
+설문(가입 리서치)
+공개: 이름, 나이, 키, 사진(1~5장/JPG·PNG ≤10MB), 직업, 학력, MBTI, 취미(다중), 지역(시도/시군구), 자취여부, 장점어필(≤500자).
+비공개(선택, 스킵 가능): 재산수준(중간/꽤많음/많음/미응답), 외모·몸매 자신감(1~5/미응답), 성격·가치관 간단 설문.
+선호도 랭킹(1~5위): 나이/키/지역/MBTI/취미유사/학력/직업군… 적게 선택할수록 영향↑ (가중: 1위=5…5위=1, 필요 시 ×(5/k) 보정).
+동의: 약관/개인정보/민감정보(선택입력) 고지, 마케팅 선택 동의.
+1.2 한도 규칙 (기본값)
+월간 시도(요청) 한도: 15회. 보낸 즉시 1회 소진, 취소해도 복구 없음.
+월간 성공(매칭 성사) 한도: 5회. 성공 5회 달성 시 해당 월 추가 성사 불가.
+동시 진행 한도: 3건. accepted/chatting 상태 기준, 종료 전까지 슬롯 점유.
+월 리셋: 매월 1일 00:00 KST에 시도/성공 카운터 0.
+일관 정책(교차검증 완료)
+성공 한도 5회 달성 시: 요청 버튼 비활성화. 과거 요청이 뒤늦게 수락될 경우 자동 거절.
+요청·수락 모두에서 한도/슬롯 재검증(경합 안전).
+1.3 매칭 라이프사이클(상태)
+requested (A→B 요청; A.monthly_attempts+1)
+ ├─(B 수락)→ accepted + chatting (양측 monthly_successes+1, concurrent_matches+1, 메시지/전화번호 가능)
+ ├─(n일 미응답)→ ignored (자동 종료; 암묵적 ‘무시’)
+ └─(취소)→ ended
+accepted/chatting
+ ├─(종료)→ ended  (슬롯 회수)
+ └─(연애중 전환)→ ended + (전환자 status=dating, 프로필 비노출)
+전화번호 노출: accepted 이후 버튼으로 1회 노출(감사로그).
+1.4 종료/평점/블랙
+종료 시(선택): 👎 텀즈 다운 / 👍 텀즈 업 / 👍👍 투 텀즈 업
+업: 이유 아이콘 최대 3개(매너/대화/사진유사/시간약속/관심사/적극성/예의…)
+다운: 사유 1개 필수(무례/약속파기/사진불일치/과음·흡연/지각/위생/홍보 등) → 블랙 여부 확인
+블랙=Y: 자유사유(≤200자), 양방향 매칭·노출 차단.
+ignored: 평점 생략/무응답 플래그만 집계.
+평점/블랙은 외부 비노출, 내부 품질·안전·추천 보정에 사용(양호 시 ‘매너 배지’ 등 긍정 뱃지 가능).
+1.5 리더보드/상태
+유저 상태: active(활성) / pause(쉬는중) / dating(연애중).
+리더보드: active 노출, pause는 ‘쉬는중’ 배지(요청 비활성 옵션), dating 비노출.
+내 상태는 사용자가 직접 전환 가능.
+2) 랭킹/추천(0~100)
+2.1 단일방향 확률
+YouLike(u→v)  = σ( wC*ContentSim(u,v) + wM*MF(u,v) + wX*CTR(u,v,ctx) )
+TheyLike(v→u) = σ( wC*ContentSim(v,u) + wM*MF(v,u) + wX*CTR(v,u,ctx, Z_app(u; group=v)) )
+ContentSim: 공개필드 유사도(나이/키/거리·지역/MBTI/취미 자카드/학력/직업/자취/PR임베딩) + 선호도 랭킹 가중.
+MF: implicit-ALS(좋아요/요청/매칭 신뢰도 가중) → 시그모이드로 [0,1].
+CTR 모델: (XGBoost/LR/FM) + 컨텍스트(시간/랭크/신규·인기).
+오프정책 보정: IPS/SNIPS (impressions에 propensity 로깅).
+2.2 상호 결합·재랭킹
+Base = HarmonicMean(YouLike, TheyLike)                    # [0,1]
+Adj  = CalibrateToUserPrefs(u, Base)                       # 상위N 속성비율을 사용자 1~5위 중요도 분포로 근사
+Div  = DiversityExposure(u, Adj)                           # 군집거리 늘리기, 신규 가산, 인기 clip
+2.3 외모 보정(최대 15% 캡, 내부용)
+appearance_score∈[0,100] → 그룹(성별/연령대/지역대) 표준화 Z_app.
+Aterm = tanh( ( Z_app(u;group=v) + 0.3*Z_app(v;group=u) ) / 4 ).
+Final = Div * ( 1 + clamp(Aterm*0.15, -0.15, +0.15) ).
+Score = round(100 * Final).
+이중 안전장치: (1) 모델 계수 제한, (2) 최종 ±15% 캡. 점수는 UI 비노출, 긍정 카피만 안내.
+2.4 피드/탐색
+기본 정렬: Score 내림차순.
+탐색 슬롯 α%: LinUCB/Thompson으로 신규·저노출을 삽입, 학습 데이터 확보.
+일일 노출 상한(과부하 방지) 및 연속 거절 시 다양성/템포 조절.
+3) 외모 추정지표(appearance_score)
+3.1 산식
+like_rate     = likes / max(impressions, 1)
+click_rate    = photo_clicks / max(impressions, 1)
+request_rate  = requests / max(impressions, 1)
+
+# 베이즈 스무딩(m=100, 그룹 평균 prior)
+smoothed(x) = (obs + m*group_mean) / (impr + m)
+
+# 그룹 표준화(성/연령/지역 단위)
+z = (smoothed - μ_g) / σ_g
+norm = clamp(50 + 10*z, 0, 100)
+
+SelfConf(1~5 → 20/40/60/80/100, 0=미응답→50)
+
+appearance_score = clamp(0.4*SelfConf + 0.3*like_norm + 0.2*click_norm + 0.1*request_norm, 0, 100)
+appearance_confidence = min(1, impressions/300)
+UX: 점수 자체 비노출. “프로필 반응이 좋아요 👍”, “사진을 바꿔보면 관심이 더 늘 수 있어요” 등 긍정적 메시지만.
+4) 데이터 모델(요약)
+-- users (공개 요약 포함)
+users(
+  id BIGSERIAL PK,
+  email TEXT UNIQUE NOT NULL,
+  password_hash TEXT NOT NULL,
+  name TEXT, age INT, height_cm INT,
+  job_title TEXT, education_level TEXT, mbti TEXT,
+  region_sido TEXT, region_sigungu TEXT,
+  living_alone BOOL, bio_note TEXT,
+  status TEXT CHECK (status IN ('active','pause','dating')) DEFAULT 'active',
+  monthly_attempts INT DEFAULT 0,
+  monthly_successes INT DEFAULT 0,
+  concurrent_matches INT DEFAULT 0,
+  last_reset_yyyymm CHAR(6),
+  created_at TIMESTAMPTZ DEFAULT now(), updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+user_photos(id PK, user_id FK, url TEXT, is_primary BOOL, created_at TIMESTAMPTZ);
+user_hobbies(user_id FK, hobby_code TEXT, PRIMARY KEY(user_id, hobby_code));
+
+-- 비공개(민감)
+user_private(
+  user_id PK FK,
+  wealth_level TEXT CHECK (wealth_level IN ('unknown','mid','high','very_high')) DEFAULT 'unknown',
+  look_confidence SMALLINT DEFAULT 0,   -- 0=미응답, 1~5
+  body_confidence SMALLINT DEFAULT 0,
+  values_json JSONB
+);
+
+-- 선호도 랭킹(1~5위)
+user_preferences(user_id FK, rank SMALLINT, factor_code TEXT, PRIMARY KEY(user_id, rank));
+
+-- 외모 추정
+user_metrics_daily(user_id FK, date DATE, impressions INT, photo_clicks INT, likes INT, requests INT, PRIMARY KEY(user_id,date));
+user_appearance(user_id PK FK, appearance_score SMALLINT, appearance_confidence NUMERIC, updated_at TIMESTAMPTZ);
+
+-- 가입코드
+signup_codes(id PK, code TEXT UNIQUE, valid_yyyymm CHAR(6), max_uses INT, used_count INT, is_active BOOL, created_at TIMESTAMPTZ);
+
+-- 매칭/메시지/평점/블랙
+matches(
+  id BIGSERIAL PK,
+  a_user_id BIGINT FK, b_user_id BIGINT FK,
+  state TEXT CHECK (state IN ('requested','accepted','chatting','ended','ignored')) NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  accepted_at TIMESTAMPTZ, ended_at TIMESTAMPTZ,
+  end_reason TEXT CHECK (end_reason IN ('normal','dating','ignored','blocked')),
+  phone_exchanged_at TIMESTAMPTZ
+);
+CREATE INDEX ON matches(a_user_id, state);
+CREATE INDEX ON matches(b_user_id, state);
+
+match_messages(id PK, match_id FK, sender_id FK, text TEXT, created_at TIMESTAMPTZ);
+
+match_ratings(
+  id BIGSERIAL PK, match_id BIGINT FK, rater_user_id BIGINT FK, target_user_id BIGINT FK,
+  rating TEXT CHECK (rating IN ('down','up','double_up','none')),
+  reasons_up JSONB, reason_down TEXT, blacklist_flag BOOL, blacklist_reason TEXT, created_at TIMESTAMPTZ
+);
+CREATE UNIQUE INDEX ON match_ratings(rater_user_id, match_id);
+
+blacklist(user_id BIGINT, blocked_user_id BIGINT, reason TEXT, created_at TIMESTAMPTZ, PRIMARY KEY(user_id, blocked_user_id));
+
+-- 오프정책/IPS 로깅
+impressions(user_id BIGINT, target_id BIGINT, rank INT, policy TEXT, propensity NUMERIC, ts TIMESTAMPTZ);
+events(user_id BIGINT, target_id BIGINT, type TEXT, ts TIMESTAMPTZ);
+5) API 스펙(핵심)
+5.1 인증/회원
+POST /auth/signup/verify-code → {ok, reason?}
+POST /auth/signup → {user_id}
+POST /auth/login → {token}
+GET /me → {public, private?}
+5.2 피드/매칭
+GET /feed?limit=K → {candidates:[{id, public_profile, score, reason_codes[]}]}
+POST /event/like {target_id} → {ok}
+POST /match/request {target_id} → 201 {match_id}
+서버에서: 한도/슬롯/블랙/상태 검증 + attempts+1 + IPS 로깅
+POST /match/accept {match_id} → {ok}
+양측 잠금 후: successes+1, concurrent+1, phone 권한 ON
+POST /match/end {match_id, end_type:'normal'|'dating'} → {ok}
+POST /match/rate {match_id, rating, reasons_up[], reason_down?, blacklist_flag?, blacklist_reason?} → {ok}
+GET /match/progress → 진행중(≤3) + 과거
+5.3 상태/리더보드
+POST /user/status {status:'active'|'pause'|'dating'} → {ok}
+GET /leaderboard → active 중심, pause 배지, dating 비노출
+5.4 관리자(Admin, RBAC)
+GET /admin/users?query=... / GET /admin/users/{id}
+PATCH /admin/users/{id} {status?, counters?, notes?}
+GET /admin/matches?state=... / PATCH /admin/matches/{id} {force_state?, reason?}
+GET /admin/reports / POST /admin/reports/{id}/resolve
+GET /admin/blacklist / POST /admin/blacklist / DELETE /admin/blacklist/{uid}/{blocked}
+POST /admin/signup-codes {yyyymm, max_uses} / GET /admin/signup-codes
+GET /admin/policy / PATCH /admin/policy // 탐색비율, 외모캡, 한도 변경
+GET /admin/audit-logs?filters... / GET /admin/exports?job_id=...
+표준 오류 코드(예시)
+ERR_MONTHLY_ATTEMPT_LIMIT  // "이번 달 요청 한도(15회)를 모두 사용했어요."
+ERR_MONTHLY_SUCCESS_LIMIT  // "이번 달 매칭 성공 한도(5회)를 채웠어요."
+ERR_CONCURRENT_LIMIT       // "진행 중 소개팅이 3건이에요. 종료 후 시도해주세요."
+ERR_TARGET_NOT_AVAILABLE   // "상대가 현재 진행 가능한 상태가 아니에요."
+ERR_BLACKLISTED            // "서로 매칭할 수 없어요."
+ERR_INVALID_SIGNUP_CODE    // "해당 월의 가입코드가 아니거나 만료됐어요."
+6) 트랜잭션/동시성 의사코드
+# 요청
+tx:
+  u = lock_user(requester)
+  v = lock_user(target)
+  assert u.status != 'dating' and v.status != 'dating'
+  assert not is_blacklisted(u,v) and not is_blacklisted(v,u)
+  assert u.monthly_attempts < 15
+  create_match(u,v,state='requested')
+  u.monthly_attempts += 1
+commit
+
+# 수락
+tx:
+  u = lock_user(requester)  # match.a_user_id
+  v = lock_user(accepter)   # match.b_user_id
+  assert u.concurrent_matches < 3 and v.concurrent_matches < 3
+  assert u.monthly_successes < 5 and v.monthly_successes < 5
+  update match.state='accepted', accepted_at=now()
+  u.monthly_successes += 1; v.monthly_successes += 1
+  u.concurrent_matches += 1; v.concurrent_matches += 1
+  enable_phone_access(match_id)
+commit
+
+# 종료/연애중
+tx:
+  m = lock_match(match_id)
+  if end_type == 'dating':
+     set caller.status='dating'
+  if m.state in ('accepted','chatting'):
+     dec caller.concurrent_matches
+  set m.state='ended', m.end_reason=(end_type=='dating' ? 'dating' : 'normal'), m.ended_at=now()
+commit
+7) Admin 콘솔 (요약)
+RBAC: Owner(Admin 전권)/Admin/Moderator/Analyst/Support + 2FA(OTP) + 감사로그.
+대시보드: DAU/신규/노출·좋아요·요청률/상호매칭/슬롯포화/연애중 전환/신고·블랙/배치 상태.
+회원관리: 목록(필터/검색/일괄액션)/상세(공개·비공개·카운터·평판·히스토리)/상태변경/보정/제재.
+매칭현황: 리스트/상세/강제종료/번호권한 회수/채팅 열람(권한 분리).
+신고·블랙: 접수→조사→판단 워크플로우, 블랙 목록/해제.
+평점/품질: 👍/👍👍/👎 분포, 사유 탑N, 아웃라이어, 개입(사진가이드 푸시).
+가입코드/배치: 월 코드 생성·상태/사용 현황, 배치 잡 모니터(appearance/ALS/ignored).
+정책: 탐색비율, 외모 캡, 캘리브레이션 강도, 한도치, A/B 토글.
+리포트/내보내기: CSV/Parquet, 워터마크·만료 링크.
+8) 배치/스케줄
+매일 03:00: appearance_score 재계산, 오래된 requested → ignored(예: 7일) 자동 전환.
+매월 1일 00:00: monthly_attempts=0, monthly_successes=0.
+주기: implicit-ALS(일/주), CTR 모델(주) 재학습.
+9) 비기능/보안/프라이버시
+보안: HTTPS, Argon2/BCrypt, 업로드 AV 스캔, 서명 URL 업로드.
+프라이버시: 비공개 테이블 분리, 최소 권한(필드 단위), 마스킹(전화/메시지).
+감사: 모든 Admin 변경/전화번호 보기/블랙 사유 로그.
+성능: 피드 API P95 < 300ms(캐시/프리컴퓨팅), DB 인덱스 위 시나리오 반영.
+확장: Feature Flag로 정책·가중치 핫스왑.
+10) Feature Flags(예시)
+{
+  "LIMITS": {"MONTHLY_ATTEMPTS":15, "MONTHLY_SUCCESSES":5, "CONCURRENT":3, "IGNORE_DAYS":7},
+  "RANKING": {"EXPLORE_ALPHA":0.10, "POPULARITY_CLIP":0.95},
+  "APPEARANCE": {"CAP":0.15, "SMOOTHING_M":100, "CONF_FULL_IMPR":300, "PEER_WEIGHT":0.3},
+  "CALIBRATION": {"TOPN":20, "LAMBDA":0.3},
+  "ALS": {"FACTORS":64, "REG":0.05, "ITERS":20}
+}
+11) 수용 기준(샘플 QA)
+ 월 코드 없이는 가입 불가, YYYYMM·활성·사용한도 체크.
+ 비공개 미입력 가능(경고 없음), 선호도 1개만 선택해도 가중 반영.
+ 피드 점수 0~100 산출, 외모 보정은 ±15% 이내.
+ 요청/수락 시 한도·슬롯·블랙 이중 체크, 경합 테스트 통과.
+ 진행중 최대 3건 유지, 종료·연애중 전환 시 슬롯 회수.
+ 종료 플로우: 업/다운/투업 + 이유 선택, 다운시 블랙 옵션·사유.
+ 연애중 전환 시 프로필 Off, 리더보드 비노출.
+ Admin에서 회원 상태/카운터 보정, 매칭 강제 종료, 코드 생성 가능.
+ IPS 로깅(정책/propensity/랭크) 저장 및 모델 학습 파이프라인에 반영.
+12) 구현 순서(권장)
+DB 스키마/마이그레이션/인덱스
+인증·가입코드·설문 API(공개/비공개 분리)
+피드 노출/이벤트 로깅(IPS) + 한도·슬롯 검증
+매칭 상태머신/채팅/전화번호 권한
+종료/평점/블랙 워크플로우
+랭킹: ContentSim+implicit-ALS → CTR(IPS) → 상호결합/캘리브레이션/다양성 → 외모캡 통합
+배치(appearance/ignored/ALS)
+Admin 콘솔(RBAC/대시보드/정책)
+모니터링/알람/A-B 파라미터 튜닝
