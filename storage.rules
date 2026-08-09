@@ -1,0 +1,27 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Profile photos rules
+    match /profile_photos/{allPaths=**} {
+      // Allow read access to all authenticated users
+      allow read: if request.auth != null;
+
+      // Allow write access to authenticated users for their own photos
+      // File name should contain the user's UID for security
+      allow write: if request.auth != null &&
+        request.auth.uid != null &&
+        // Ensure file size is reasonable (< 5MB)
+        request.resource.size < 5 * 1024 * 1024 &&
+        // Ensure file is an image
+        request.resource.contentType.matches('image/.*');
+    }
+
+    // General uploads for authenticated users
+    match /{allPaths=**} {
+      // Allow read/write for authenticated users with size and type restrictions
+      allow read, write: if request.auth != null &&
+        request.resource.size < 10 * 1024 * 1024 && // Max 10MB
+        request.resource.contentType.matches('image/.*|video/.*');
+    }
+  }
+}

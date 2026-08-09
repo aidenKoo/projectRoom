@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  flutter-app:
+    build: .
+    volumes:
+      - ../..:/workspaces:cached
+    command: sleep infinity
+    ports:
+      - "3000:3000"   # Flutter dev server
+      - "4000:4000"   # Firebase UI
+      - "5000:5000"   # Firebase hosting
+      - "5001:5001"   # Firebase functions
+      - "8080:8080"   # Firestore emulator
+      - "9099:9099"   # Firebase auth
+      - "9199:9199"   # Firebase storage
+    environment:
+      - FLUTTER_ROOT=/home/cirrus/sdks/flutter
+      - PATH=/home/cirrus/sdks/flutter/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/home/cirrus/.pub-cache/bin
+      - CHROME_EXECUTABLE=/usr/bin/google-chrome
+    working_dir: /workspaces/projectRoom
+    user: cirrus
